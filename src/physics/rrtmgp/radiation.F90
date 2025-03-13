@@ -54,6 +54,7 @@ use mo_optical_props,      only: ty_optical_props_1scl, ty_optical_props_2str
 use mo_source_functions,   only: ty_source_func_lw
 use mo_fluxes,             only: ty_fluxes_broadband
 use mo_fluxes_byband,      only: ty_fluxes_byband
+use mo_rte_kind,           only: wl
 
 use string_utils,        only: to_lower
 use cam_abortutils,      only: endrun, handle_allocate_error
@@ -1208,7 +1209,7 @@ subroutine radiation_tend( &
 
                   ! Compute clear-sky fluxes.
                   errmsg = rte_sw(&
-                     atm_optics_sw, top_at_1, coszrs_day, toa_flux, &
+                     atm_optics_sw, coszrs_day, toa_flux, &
                      alb_dir, alb_dif, fswc)
                   call stop_on_err(errmsg, sub, 'clear-sky rte_sw')
 
@@ -1218,7 +1219,7 @@ subroutine radiation_tend( &
 
                   ! Compute all-sky fluxes.
                   errmsg = rte_sw(&
-                     atm_optics_sw, top_at_1, coszrs_day, toa_flux, &
+                     atm_optics_sw, coszrs_day, toa_flux, &
                      alb_dir, alb_dif, fsw)
                   call stop_on_err(errmsg, sub, 'all-sky rte_sw')
                   !$acc end data
@@ -1306,7 +1307,7 @@ subroutine radiation_tend( &
                call stop_on_err(errmsg, sub, 'aer_lw%increment')
 
                ! Compute clear-sky LW fluxes
-               errmsg = rte_lw(atm_optics_lw, top_at_1, sources_lw, emis_sfc, flwc)
+               errmsg = rte_lw(atm_optics_lw, sources_lw, emis_sfc, flwc)
                call stop_on_err(errmsg, sub, 'clear-sky rte_lw')
 
                ! Increment the gas+aerosol optics by the cloud optics.
@@ -1314,7 +1315,7 @@ subroutine radiation_tend( &
                call stop_on_err(errmsg, sub, 'cloud_lw%increment')
 
                ! Compute all-sky LW fluxes
-               errmsg = rte_lw(atm_optics_lw, top_at_1, sources_lw, emis_sfc, flw)
+               errmsg = rte_lw(atm_optics_lw, sources_lw, emis_sfc, flw)
                call stop_on_err(errmsg, sub, 'all-sky rte_lw')
                !$acc end data
                
@@ -1850,9 +1851,9 @@ subroutine coefs_init(coefs_file, available_gases, kdist)
                                                     minor_limits_gpt_upper
    ! Send these to RRTMGP as logicals,
    ! but they have to be read from the netCDF as integers
-   logical, dimension(:),            allocatable :: minor_scales_with_density_lower, &
+   logical(wl), dimension(:),        allocatable :: minor_scales_with_density_lower, &
                                                     minor_scales_with_density_upper
-   logical, dimension(:),            allocatable :: scale_by_complement_lower, &
+   logical(wl), dimension(:),        allocatable :: scale_by_complement_lower, &
                                                     scale_by_complement_upper
    integer, dimension(:), allocatable :: int2log   ! use this to convert integer-to-logical.
    integer, dimension(:),            allocatable :: kminor_start_lower, kminor_start_upper
