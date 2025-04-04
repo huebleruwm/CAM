@@ -14,12 +14,15 @@ module mo_setsox
   integer            ::  id_msa
 
   integer :: id_so2, id_nh3, id_hno3, id_h2o2, id_o3, id_ho2
-  integer :: id_so4, id_h2so4
+  integer :: id_so4, id_h2so4, id_co2
 
   logical :: has_sox = .true.
-  logical :: inv_so2, inv_nh3, inv_hno3, inv_h2o2, inv_ox, inv_nh4no3, inv_ho2
+  logical :: inv_so2, inv_nh3, inv_hno3, inv_h2o2, inv_ox, inv_nh4no3, inv_ho2, inv_co2
 
   logical :: cloud_borne = .false.
+
+  ! Inidices for species in the shared array of Henry's Law constant parameters
+  integer :: heff_id_hno3, heff_id_so2, heff_id_nh3, heff_id_co2, heff_id_h2o2, heff_id_o3
 
 contains
 
@@ -100,12 +103,32 @@ contains
        id_ho2 = get_spc_ndx( 'HO2' )
     endif
 
-    has_sox = (id_so2>0) .and. (id_h2o2>0) .and. (id_o3>0) .and. (id_ho2>0)
+    id_co2 = get_inv_ndx( 'CO2' )
+    inv_co2 = id_co2 > 0
+    if ( .not. inv_co2 ) then
+       id_co2 = get_spc_ndx( 'CO2' )
+    endif
+
+    has_sox = (id_so2>0) .and. (id_h2o2>0) .and. (id_o3>0) .and. (id_ho2>0) &
+              .and. (id_co2>0)
     if (cloud_borne) then
        has_sox = has_sox .and. (id_h2so4>0)
     else
        has_sox = has_sox .and. (id_so4>0) .and. (id_nh3>0)
     endif
+
+    ! Lookup Effective Henry's Law Constant parameters from the common
+    ! data file read in the shared code.
+    heff_id_hno3 = get_heff_index( 'HNO3' )
+    heff_id_so2  = get_heff_index( 'SO2'  )
+    heff_id_nh3  = get_heff_index( 'NH3'  )
+    heff_id_co2  = get_heff_index( 'CO2'  )
+    heff_id_h2o2 = get_heff_index( 'H2O2' )
+    heff_id_o3   = get_heff_index( 'OX'   )
+
+    has_sox = has_sox .and. (heff_id_hno3 > 0) .and. (heff_id_so2 > 0) &
+               .and. (heff_id_nh3 > 0) .and. (heff_id_co2 > 0) &
+               .and. (heff_id_h2o2 > 0) .and. (heff_id_o3 > 0)
 
     if (masterproc) then
        write(iulog,*) 'sox_inti: has_sox = ',has_sox
@@ -144,7 +167,6 @@ contains
        lwc,    &
        cldfrc, &
        cldnum, &
-       xhnm,   &
        invariants, &
        qcw,    &
        qin,    &
@@ -171,6 +193,8 @@ contains
     !           (b) PARTIONING
     !           (c) REACTION rates
     !           (d) PREDICTION
+    !
+    ! NOTE: This routine assumes an Ideal Gas.
     !-----------------------------------------------------------------------
     !
     use ppgrid,       only : pcols, pver
@@ -180,6 +204,7 @@ contains
     use mo_constants, only : pi
     use sox_cldaero_mod, only : sox_cldaero_update, sox_cldaero_create_obj, sox_cldaero_destroy_obj
     use cldaero_mod,     only : cldaero_conc_t
+    use shr_drydep_mod,  only : dheff
 
     !
     !-----------------------------------------------------------------------
@@ -197,7 +222,6 @@ contains
     real(r8), target, intent(in)    :: lwc(:,:)          ! cloud liquid water content (kg/kg)
     real(r8), target, intent(in)    :: cldfrc(:,:)       ! cloud fraction
     real(r8),         intent(in)    :: cldnum(:,:)       ! droplet number concentration (#/kg)
-    real(r8),         intent(in)    :: xhnm(:,:)         ! total atms density ( /cm**3)
     real(r8),         intent(in)    :: invariants(:,:,:)
     real(r8), target, intent(inout) :: qcw(:,:,:)        ! cloud-borne aerosol (vmr)
     real(r8),         intent(inout) :: qin(:,:,:)        ! transported species ( vmr )
@@ -218,7 +242,13 @@ contains
     !-----------------------------------------------------------------------
     integer,  parameter :: itermax = 20
     real(r8), parameter :: ph0 = 5.0_r8  ! INITIAL PH VALUES
-    real(r8), parameter :: const0 = 1.e3_r8/6.023e23_r8
+    real(r8), parameter :: AVOGADRO = 6.02214076e23_r8          ! mol-1
+    real(r8), parameter :: BOLTZMANN = 1.380649e-23_r8          ! J K-1
+    real(r8), parameter :: PASCAL_TO_ATM = 1.0_r8 / 101325.0_r8 ! atm Pa-1
+    real(r8), parameter :: M3_TO_L = 1.0e3_r8                   ! L m-3
+    real(r8), parameter :: M3_TO_CM3 = 1.0e6_r8                 ! cm3 m-3
+    real(r8), parameter :: SMALL_NUMBER = 1.0e-30_r8
+    real(r8), parameter :: const0 = 1.e3_r8/AVOGADRO
     real(r8), parameter :: xa0 = 11._r8
     real(r8), parameter :: xb0 = -.1_r8
     real(r8), parameter :: xa1 = 1.053_r8
@@ -232,18 +262,18 @@ contains
     real(r8), parameter :: kh1 = 2.05e-5_r8         ! HO2(a)          -> H+ + O2-
     real(r8), parameter :: kh2 = 8.6e5_r8           ! HO2(a) + ho2(a) -> h2o2(a) + o2
     real(r8), parameter :: kh3 = 1.e8_r8            ! HO2(a) + o2-    -> h2o2(a) + o2
-    real(r8), parameter :: Ra = 8314._r8/101325._r8 ! universal constant   (atm)/(M-K)
-    real(r8), parameter :: xkw = 1.e-14_r8          ! water acidity
+    real(r8), parameter :: Ra = BOLTZMANN * AVOGADRO * M3_TO_L * PASCAL_TO_ATM ! universal constant   (atm)/(M-K)
 
     !
     real(r8) :: xdelso4hp(ncol,pver)
+    real(r8) :: xhnm(ncol,pver) ! air number density (molecules cm-3)
 
     integer  :: k, i, iter, file
     real(r8) :: wrk, delta
     real(r8) :: xph0, aden, xk, xe, x2
-    real(r8) :: tz, xl, px, qz, pz, es, qs, patm
+    real(r8) :: tz, xl, px, qz, es, qs, patm
     real(r8) :: Eso2, Eso4, Ehno3, Eco2, Eh2o, Enh3
-    real(r8) :: so2g, h2o2g, co2g, o3g
+    real(r8) :: so2g, h2o2g, o3g
     real(r8) :: hno3a, nh3a, so2a, h2o2a, co2a, o3a
     real(r8) :: rah2o2, rao3, pso4, ccc
     real(r8) :: cnh3, chno3, com, com1, com2, xra
@@ -261,7 +291,7 @@ contains
     real(r8) :: r2h2o2 ! prod(h2o2) by ho2 in mix/s
 
     real(r8), dimension(ncol,pver)  ::             &
-         xhno3, xh2o2, xso2, xso4, xno3, &
+         xhno3, xh2o2, xso2, xso4, xno3, xco2, &
          xnh3, xnh4, xo3,         &
          cfact, &
          xph, xho2,         &
@@ -271,8 +301,6 @@ contains
          heso2,  &            ! henry law const for so2
          henh3,  &            ! henry law const for nh3
          heo3              !!,   &            ! henry law const for o3
-
-    real(r8) :: patm_x
 
     real(r8), dimension(ncol)  :: work1
     logical :: converged
@@ -285,6 +313,7 @@ contains
     real(r8) :: fact1_hno3, fact2_hno3, fact3_hno3
     real(r8) :: fact1_so2, fact2_so2, fact3_so2, fact4_so2
     real(r8) :: fact1_nh3, fact2_nh3, fact3_nh3
+    real(r8) :: fact1_co2, fact2_co2, fact3_co2, fact4_co2
     real(r8) :: tmp_hp, tmp_hso3, tmp_hco3, tmp_nh4, tmp_no3
     real(r8) :: tmp_oh, tmp_so3, tmp_so4
     real(r8) :: tmp_neg, tmp_pos
@@ -301,12 +330,13 @@ contains
     !      ... Initial values
     !           The values of so2, so4 are after (1) SLT, and CHEM
     !-----------------------------------------------------------------
+    xhnm(:,:) = press(:,:) / (tfld(:,:) * M3_TO_CM3 * BOLTZMANN)  ! air number density (molecules cm-3)
     xph0 = 10._r8**(-ph0)                      ! initial PH value
 
     do k = 1,pver
        cfact(:,k) = xhnm(:,k)     &          ! /cm3(a)
             * 1.e6_r8             &          ! /m3(a)
-            * 1.38e-23_r8/287._r8 &          ! Kg(a)/m3(a)
+            * BOLTZMANN/287._r8   &          ! Kg(a)/m3(a)
             * 1.e-3_r8                       ! Kg(a)/L(a)
     end do
 
@@ -357,6 +387,12 @@ contains
           xho2 (:,k) = qin(:,k,id_ho2)                 ! mixing ratio
        endif
 
+       if ( inv_co2 ) then
+          xco2 (:,k) = invariants(:,k,id_co2)/xhnm(:,k) ! mixing ratio
+       else
+          xco2 (:,k) = qin(:,k,id_co2)                  ! mixing ratio
+       endif
+
        if (cloud_borne) then
           xh2so4(:,k) = qin(:,k,id_h2so4)
        else
@@ -396,10 +432,9 @@ contains
              !-----------------------------------------------------------------
 
              !-----------------------------------------------------------------
-             pz = .01_r8*press(i,k)       !! pressure in mb
              tz = tfld(i,k)
-             patm = pz/1013._r8
-             xam  = press(i,k)/(1.38e-23_r8*tz)  !air density /M3
+             patm = press(i,k) * PASCAL_TO_ATM ! atm
+             xam  = press(i,k)/(BOLTZMANN*tz)  ! air density /M3
 
              !-----------------------------------------------------------------
              !        ... hno3
@@ -418,8 +453,8 @@ contains
              !          = xk*xe*patm*xhno3/(1 + xk*ra*tz*xl*(1 + xe/hplus)
              !          = ( fact1_hno3    )/(1 + fact2_hno3 *(1 + fact3_hno3/hplus)
              !    [hno3-] = ehno3/hplus
-             xk = 2.1e5_r8 *EXP( 8700._r8*work1(i) )
-             xe = 15.4_r8
+             xk = dheff(1,heff_id_hno3) * exp( dheff(2,heff_id_hno3) * work1(i) )
+             xe = dheff(3,heff_id_hno3) * exp( dheff(4,heff_id_hno3) * work1(i) )
              fact1_hno3 = xk*xe*patm*xhno3(i,k)
              fact2_hno3 = xk*ra*tz*xl
              fact3_hno3 = xe
@@ -441,9 +476,9 @@ contains
              !          = xk*xe*patm*xso2/(1 + xk*ra*tz*xl*(1 + (xe/hplus)*(1 + x2/hplus))
              !          = ( fact1_so2    )/(1 + fact2_so2 *(1 + (fact3_so2/hplus)*(1 + fact4_so2/hplus)
              !    [hso3-] + 2*[so3--] = (eso2/hplus)*(1 + 2*x2/hplus)
-             xk = 1.23_r8  *EXP( 3120._r8*work1(i) )
-             xe = 1.7e-2_r8*EXP( 2090._r8*work1(i) )
-             x2 = 6.0e-8_r8*EXP( 1120._r8*work1(i) )
+             xk = dheff(1,heff_id_so2) * exp( dheff(2,heff_id_so2) * work1(i) )
+             xe = dheff(3,heff_id_so2) * exp( dheff(4,heff_id_so2) * work1(i) )
+             x2 = dheff(5,heff_id_so2) * exp( dheff(6,heff_id_so2) * work1(i) )
              fact1_so2 = xk*xe*patm*xso2(i,k)
              fact2_so2 = xk*ra*tz*xl
              fact3_so2 = xe
@@ -466,25 +501,38 @@ contains
              !          = ((xk*xe*patm/xkw)*xnh34)/(1 + xk*ra*tz*xl*(1 + xe*hplus/xkw)
              !          = ( fact1_nh3            )/(1 + fact2_nh3  *(1 + fact3_nh3*hplus)
              !    [nh4+] = enh3*hplus
-             xk = 58._r8   *EXP( 4085._r8*work1(i) )
-             xe = 1.7e-5_r8*EXP( -4325._r8*work1(i) )
-
-             fact1_nh3 = (xk*xe*patm/xkw)*(xnh3(i,k)+xnh4(i,k))
+             ! NOTE: Algorithm modified to follow that used in wet deposition.
+             !       This essentially replaces xkw (1.0e-14) with a temperature
+             !       dependent value for the water dissociation constant, x2.
+             xk = dheff(1,heff_id_nh3) * exp( dheff(2,heff_id_nh3) * work1(i) )
+             xe = dheff(3,heff_id_nh3) * exp( dheff(4,heff_id_nh3) * work1(i) )
+             x2 = dheff(5,heff_id_nh3) * exp( dheff(6,heff_id_nh3) * work1(i) )
+             fact1_nh3 = (xk*xe*patm/x2)*(xnh3(i,k)+xnh4(i,k))
              fact2_nh3 = xk*ra*tz*xl
-             fact3_nh3 = xe/xkw
+             fact3_nh3 = xe/x2
 
              !-----------------------------------------------------------------
              !        ... h2o effects
+             ! NOTE: Algorithm modified to follow that used in wet deposition.
+             !       This essentially replaces xkw (1.0e-14) with a temperature
+             !       dependent value for the water dissociation constant, x2
+             !       (calculated above with NH4 Heff terms).
              !-----------------------------------------------------------------
-             Eh2o = xkw
+             Eh2o = x2
 
              !-----------------------------------------------------------------
              !        ... co2 effects
+             ! NOTE: Algorithm modified to follow that used in wet deposition.
+             !       This now applies the same algorithm for diprotic acids used
+             !       for SO2.
              !-----------------------------------------------------------------
-             co2g = 330.e-6_r8                            !330 ppm = 330.e-6 atm
-             xk = 3.1e-2_r8*EXP( 2423._r8*work1(i) )
-             xe = 4.3e-7_r8*EXP(-913._r8 *work1(i) )
-             Eco2 = xk*xe*co2g  *patm
+             xk = dheff(1,heff_id_co2) * exp( dheff(2,heff_id_co2) * work1(i) )
+             xe = dheff(3,heff_id_co2) * exp( dheff(4,heff_id_co2) * work1(i) )
+             x2 = dheff(5,heff_id_co2) * exp( dheff(6,heff_id_co2) * work1(i) )
+             fact1_co2 = xk*xe*patm*xco2(i,k)
+             fact2_co2 = xk*ra*tz*xl
+             fact3_co2 = xe
+             fact4_co2 = x2
 
              !-----------------------------------------------------------------
              !         ... so4 effect
@@ -542,6 +590,12 @@ contains
                 !          ... nh3
                 !-----------------------------------------------------------------
                 Enh3 = fact1_nh3/(1.0_r8 + fact2_nh3*(1.0_r8 + fact3_nh3*xph(i,k)))
+
+                !-----------------------------------------------------------------
+                !          ... co2
+                !-----------------------------------------------------------------
+                Eco2 = fact1_co2/(1.0_r8 + fact2_co2*(1.0_r8 + (fact3_co2/xph(i,k)) &
+                     *(1.0_r8 +  fact4_co2/xph(i,k))))
 
                 tmp_nh4  = Enh3 * xph(i,k)
                 tmp_hso3 = Eso2 / xph(i,k)
@@ -635,29 +689,29 @@ contains
 
           xl = cldconc%xlwc(i,k)
 
-          patm = press(i,k)/101300._r8        ! press is in pascal
-          xam  = press(i,k)/(1.38e-23_r8*tz)  ! air density /M3
+          patm = press(i,k) * PASCAL_TO_ATM   ! atm
+          xam  = press(i,k)/(BOLTZMANN*tz)    ! air density /M3
 
           !-----------------------------------------------------------------------
           !        ... hno3
           !-----------------------------------------------------------------------
-          xk = 2.1e5_r8 *EXP( 8700._r8*work1(i) )
-          xe = 15.4_r8
+          xk = dheff(1,heff_id_hno3) * exp( dheff(2,heff_id_hno3) * work1(i) )
+          xe = dheff(3,heff_id_hno3) * exp( dheff(4,heff_id_hno3) * work1(i) )
           hehno3(i,k)  = xk*(1._r8 + xe/xph(i,k))
 
           !-----------------------------------------------------------------
           !        ... h2o2
           !-----------------------------------------------------------------
-          xk = 7.4e4_r8   *EXP( 6621._r8*work1(i) )
-          xe = 2.2e-12_r8 *EXP(-3730._r8*work1(i) )
+          xk = dheff(1,heff_id_co2) * exp( dheff(2,heff_id_co2) * work1(i) )
+          xe = dheff(3,heff_id_co2) * exp( dheff(4,heff_id_co2) * work1(i) )
           heh2o2(i,k)  = xk*(1._r8 + xe/xph(i,k))
 
           !-----------------------------------------------------------------
           !         ... so2
           !-----------------------------------------------------------------
-          xk = 1.23_r8  *EXP( 3120._r8*work1(i) )
-          xe = 1.7e-2_r8*EXP( 2090._r8*work1(i) )
-          x2 = 6.0e-8_r8*EXP( 1120._r8*work1(i) )
+          xk = dheff(1,heff_id_so2) * exp( dheff(2,heff_id_so2) * work1(i) )
+          xe = dheff(3,heff_id_so2) * exp( dheff(4,heff_id_so2) * work1(i) )
+          x2 = dheff(5,heff_id_so2) * exp( dheff(6,heff_id_so2) * work1(i) )
 
           wrk = xe/xph(i,k)
           heso2(i,k)  = xk*(1._r8 + wrk*(1._r8 + x2/xph(i,k)))
@@ -665,14 +719,15 @@ contains
           !-----------------------------------------------------------------
           !          ... nh3
           !-----------------------------------------------------------------
-          xk = 58._r8   *EXP( 4085._r8*work1(i) )
-          xe = 1.7e-5_r8*EXP(-4325._r8*work1(i) )
-          henh3(i,k)  = xk*(1._r8 + xe*xph(i,k)/xkw)
+          xk = dheff(1,heff_id_nh3) * exp( dheff(2,heff_id_nh3) * work1(i) )
+          xe = dheff(3,heff_id_nh3) * exp( dheff(4,heff_id_nh3) * work1(i) )
+          x2 = dheff(5,heff_id_nh3) * exp( dheff(6,heff_id_nh3) * work1(i) )
+          henh3(i,k)  = xk*(1._r8 + xe*xph(i,k)/x2)
 
           !-----------------------------------------------------------------
           !        ... o3
           !-----------------------------------------------------------------
-          xk = 1.15e-2_r8 *EXP( 2560._r8*work1(i) )
+          xk = dheff(1,heff_id_o3) * exp( dheff(2,heff_id_o3) * work1(i) )
           heo3(i,k) = xk
 
           !------------------------------------------------------------------------
@@ -773,18 +828,12 @@ contains
           IF (XL .ge. 1.e-8_r8) THEN    !! WHEN CLOUD IS PRESENTED
 
              if (cloud_borne) then
-                patm_x = patm
-             else
-                patm_x = 1._r8
-             endif
 
-             if (cloud_borne) then
-
-                pso4 = rah2o2 * 7.4e4_r8*EXP(6621._r8*work1(i)) * h2o2g * patm_x &
-                     * 1.23_r8 *EXP(3120._r8*work1(i)) * so2g * patm_x
+                pso4 = rah2o2 * 7.4e4_r8*EXP(6621._r8*work1(i)) * h2o2g * patm &
+                     * 1.23_r8 *EXP(3120._r8*work1(i)) * so2g * patm
              else
-                pso4 = rah2o2 * heh2o2(i,k) * h2o2g * patm_x  &
-                     * heso2(i,k)  * so2g  * patm_x    ! [M/s]
+                pso4 = rah2o2 * heh2o2(i,k) * h2o2g * patm  &
+                     * heso2(i,k)  * so2g  * patm    ! [M/s]
 
              endif
 
@@ -793,66 +842,30 @@ contains
                   / const0 & ! [/L(a)/s]
                   / xhnm(i,k)
 
+             ! estimate the net production of so4, without exceeding reactant concentrations
+             xso4_init(i,k) = xso4(i,k)
+             ccc            = max(min(pso4*dtime, min(xh2o2(i,k) - SMALL_NUMBER, xso2(i,k) - SMALL_NUMBER)), 0.0_r8)
+             xso4(i,k)      = xso4(i,k) + ccc
+             xh2o2(i,k)     = xh2o2(i,k) - ccc
+             xso2(i,k)      = xso2(i,k)  - ccc
+             xdelso4hp(i,k) = ccc
 
-             ccc = pso4*dtime
-             ccc = max(ccc, 1.e-30_r8)
-
-             xso4_init(i,k)=xso4(i,k)
-
-             IF (xh2o2(i,k) .gt. xso2(i,k)) THEN
-                if (ccc .gt. xso2(i,k)) then
-                   xso4(i,k)=xso4(i,k)+xso2(i,k)
-                   if (cloud_borne) then
-                      xh2o2(i,k)=xh2o2(i,k)-xso2(i,k)
-                      xso2(i,k)=1.e-20_r8
-                   else       ! ???? bug ????
-                      xso2(i,k)=1.e-20_r8
-                      xh2o2(i,k)=xh2o2(i,k)-xso2(i,k)
-                   endif
-                else
-                   xso4(i,k)  = xso4(i,k)  + ccc
-                   xh2o2(i,k) = xh2o2(i,k) - ccc
-                   xso2(i,k)  = xso2(i,k)  - ccc
-                end if
-
-             ELSE
-                if (ccc  .gt. xh2o2(i,k)) then
-                   xso4(i,k)=xso4(i,k)+xh2o2(i,k)
-                   xso2(i,k)=xso2(i,k)-xh2o2(i,k)
-                   xh2o2(i,k)=1.e-20_r8
-                else
-                   xso4(i,k)  = xso4(i,k)  + ccc
-                   xh2o2(i,k) = xh2o2(i,k) - ccc
-                   xso2(i,k)  = xso2(i,k)  - ccc
-                end if
-             END IF
-
-             if (cloud_borne) then
-                xdelso4hp(i,k)  =  xso4(i,k) - xso4_init(i,k)
-             endif
              !...........................
              !       S(IV) + O3 = S(VI)
              !...........................
 
-             pso4 = rao3 * heo3(i,k)*o3g*patm_x * heso2(i,k)*so2g*patm_x  ! [M/s]
+             pso4 = rao3 * heo3(i,k)*o3g*patm * heso2(i,k)*so2g*patm  ! [M/s]
 
              pso4 = pso4        &                                ! [M/s] =  [mole/L(w)/s]
                   * xl          &                                ! [mole/L(a)/s]
                   / const0      &                                ! [/L(a)/s]
                   / xhnm(i,k)                                    ! [mixing ratio/s]
 
-             ccc = pso4*dtime
-             ccc = max(ccc, 1.e-30_r8)
-
-             xso4_init(i,k)=xso4(i,k)
-
-             if (ccc .gt. xso2(i,k)) then
-                xso4(i,k) = xso4(i,k) + xso2(i,k)
-                xso2(i,k) = 1.e-20_r8
-             else
-                xso4(i,k) = xso4(i,k) + ccc
-                xso2(i,k) = xso2(i,k) - ccc
-             end if
+             ! estimate the net production of so4, without exceeding reactant concentrations
+             xso4_init(i,k) = xso4(i,k)
+             ccc            = max(min(pso4*dtime, xso2(i,k) - SMALL_NUMBER), 0.0_r8)
+             xso4(i,k)      = xso4(i,k) + ccc
+             xso2(i,k)      = xso2(i,k) - ccc
 
           END IF !! WHEN CLOUD IS PRESENTED
 
@@ -876,5 +889,20 @@ contains
     call sox_cldaero_destroy_obj(cldconc)
 
   end subroutine setsox
+
+   !-----------------------------------------------------------------
+   !       ... looks up Effective Henry's Law Constant parameters
+   !-----------------------------------------------------------------
+   pure elemental integer function get_heff_index(species_name) result(index)
+      use shr_drydep_mod, only: species_name_table, dheff
+     
+      character(len=*), intent(in) :: species_name
+
+      do index = 1, size(species_name_table)
+         if (trim(adjustl(species_name)) == &
+             trim(adjustl(species_name_table(index)))) return
+      end do
+      index = -1
+   end function get_heff_index
 
 end module mo_setsox
