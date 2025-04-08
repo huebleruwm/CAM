@@ -678,6 +678,7 @@ contains
 
     if( has_sox ) then
          call setsox( state,  &
+              pbuf,     &
               ncol,     &
               lchnk,    &
               loffset,  &

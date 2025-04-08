@@ -14,10 +14,10 @@ module mo_setsox
   integer            ::  id_msa
 
   integer :: id_so2, id_nh3, id_hno3, id_h2o2, id_o3, id_ho2
-  integer :: id_so4, id_h2so4, id_co2
+  integer :: id_so4, id_h2so4
 
   logical :: has_sox = .true.
-  logical :: inv_so2, inv_nh3, inv_hno3, inv_h2o2, inv_ox, inv_nh4no3, inv_ho2, inv_co2
+  logical :: inv_so2, inv_nh3, inv_hno3, inv_h2o2, inv_ox, inv_nh4no3, inv_ho2
 
   logical :: cloud_borne = .false.
 
@@ -103,14 +103,7 @@ contains
        id_ho2 = get_spc_ndx( 'HO2' )
     endif
 
-    id_co2 = get_inv_ndx( 'CO2' )
-    inv_co2 = id_co2 > 0
-    if ( .not. inv_co2 ) then
-       id_co2 = get_spc_ndx( 'CO2' )
-    endif
-
-    has_sox = (id_so2>0) .and. (id_h2o2>0) .and. (id_o3>0) .and. (id_ho2>0) &
-              .and. (id_co2>0)
+    has_sox = (id_so2>0) .and. (id_h2o2>0) .and. (id_o3>0) .and. (id_ho2>0)
     if (cloud_borne) then
        has_sox = has_sox .and. (id_h2so4>0)
     else
@@ -156,6 +149,7 @@ contains
 !-----------------------------------------------------------------------
 !-----------------------------------------------------------------------
   subroutine setsox( state, &
+       pbuf,   &
        ncol,   &
        lchnk,  &
        loffset,&
@@ -205,12 +199,14 @@ contains
     use sox_cldaero_mod, only : sox_cldaero_update, sox_cldaero_create_obj, sox_cldaero_destroy_obj
     use cldaero_mod,     only : cldaero_conc_t
     use shr_drydep_mod,  only : dheff
+    use physics_buffer,  only : physics_buffer_desc
 
     !
     !-----------------------------------------------------------------------
     !      ... Dummy arguments
     !-----------------------------------------------------------------------
-    type(physics_state), intent(in) :: state             ! Physics state variables
+    type(physics_state),       intent(in) :: state       ! Physics state variables
+    type(physics_buffer_desc), intent(in) :: pbuf        ! Physics buffer
     integer,          intent(in)    :: ncol              ! num of columns in chunk
     integer,          intent(in)    :: lchnk             ! chunk id
     integer,          intent(in)    :: loffset           ! offset of chem tracers in the advected tracers array
@@ -249,6 +245,8 @@ contains
     real(r8), parameter :: M3_TO_CM3 = 1.0e6_r8                 ! cm3 m-3
     real(r8), parameter :: SMALL_NUMBER = 1.0e-30_r8
     real(r8), parameter :: const0 = 1.e3_r8/AVOGADRO
+    real(r8), parameter :: MOLECULAR_WEIGHT_DRY_AIR = 0.028966_r8  ! kg mol-1
+    real(r8), parameter :: MOLECULAR_WEIGHT_CO2 = 0.044009_r8      ! kg mol-1
     real(r8), parameter :: xa0 = 11._r8
     real(r8), parameter :: xb0 = -.1_r8
     real(r8), parameter :: xa1 = 1.053_r8
@@ -302,6 +300,8 @@ contains
          henh3,  &            ! henry law const for nh3
          heo3              !!,   &            ! henry law const for o3
 
+   real(r8), pointer :: co2_mass_mixing_ratio(:,:) ! kg kg-1
+
     real(r8), dimension(ncol)  :: work1
     logical :: converged
 
@@ -331,6 +331,9 @@ contains
     !           The values of so2, so4 are after (1) SLT, and CHEM
     !-----------------------------------------------------------------
     xhnm(:,:) = press(:,:) / (tfld(:,:) * M3_TO_CM3 * BOLTZMANN)  ! air number density (molecules cm-3)
+
+    call rad_cnst_get_gas(0, 'CO2', state, pbuf, co2_mass_mixing_ratio)
+
     xph0 = 10._r8**(-ph0)                      ! initial PH value
 
     do k = 1,pver
@@ -351,6 +354,9 @@ contains
 
     do k = 1,pver
        xph(:,k) = xph0                                ! initial PH value
+
+       xco2(:,k) = co2_mass_mixing_ratio(:,k) &
+                   * (MOLECULAR_WEIGHT_DRY_AIR / MOLECULAR_WEIGHT_CO2)  ! mixing ratio
 
        if ( inv_so2 ) then
           xso2 (:,k) = invariants(:,k,id_so2)/xhnm(:,k)  ! mixing ratio
@@ -385,12 +391,6 @@ contains
           xho2 (:,k) = invariants(:,k,id_ho2)/xhnm(:,k)! mixing ratio
        else
           xho2 (:,k) = qin(:,k,id_ho2)                 ! mixing ratio
-       endif
-
-       if ( inv_co2 ) then
-          xco2 (:,k) = invariants(:,k,id_co2)/xhnm(:,k) ! mixing ratio
-       else
-          xco2 (:,k) = qin(:,k,id_co2)                  ! mixing ratio
        endif
 
        if (cloud_borne) then
