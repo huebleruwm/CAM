@@ -200,13 +200,14 @@ contains
     use cldaero_mod,     only : cldaero_conc_t
     use shr_drydep_mod,  only : dheff
     use physics_buffer,  only : physics_buffer_desc
+    use rad_constituents, only : rad_cnst_get_gas
 
     !
     !-----------------------------------------------------------------------
     !      ... Dummy arguments
     !-----------------------------------------------------------------------
-    type(physics_state),       intent(in) :: state       ! Physics state variables
-    type(physics_buffer_desc), intent(in) :: pbuf        ! Physics buffer
+    type(physics_state),                intent(in)    :: state   ! Physics state variables
+    type(physics_buffer_desc), pointer, intent(inout) :: pbuf(:) ! Physics buffer
     integer,          intent(in)    :: ncol              ! num of columns in chunk
     integer,          intent(in)    :: lchnk             ! chunk id
     integer,          intent(in)    :: loffset           ! offset of chem tracers in the advected tracers array
@@ -330,7 +331,7 @@ contains
     !      ... Initial values
     !           The values of so2, so4 are after (1) SLT, and CHEM
     !-----------------------------------------------------------------
-    xhnm(:,:) = press(:,:) / (tfld(:,:) * M3_TO_CM3 * BOLTZMANN)  ! air number density (molecules cm-3)
+    xhnm(:ncol,:) = press(:ncol,:) / (tfld(:ncol,:) * M3_TO_CM3 * BOLTZMANN)  ! air number density (molecules cm-3)
 
     call rad_cnst_get_gas(0, 'CO2', state, pbuf, co2_mass_mixing_ratio)
 
@@ -355,7 +356,7 @@ contains
     do k = 1,pver
        xph(:,k) = xph0                                ! initial PH value
 
-       xco2(:,k) = co2_mass_mixing_ratio(:,k) &
+       xco2(:ncol,k) = co2_mass_mixing_ratio(:ncol,k) &
                    * (MOLECULAR_WEIGHT_DRY_AIR / MOLECULAR_WEIGHT_CO2)  ! mixing ratio
 
        if ( inv_so2 ) then
@@ -736,22 +737,14 @@ contains
           !------------------------------------------------------------------------
           kh4 = (kh2 + kh3*kh1/xph(i,k)) / ((1._r8 + kh1/xph(i,k))**2)
           ho2s = kh0*xho2(i,k)*patm*(1._r8 + kh1/xph(i,k))  ! ho2s = ho2(a)+o2-
-          r1h2o2 = kh4*ho2s*ho2s                         ! prod(h2o2) in mole/L(w)/s
-
-          if ( cloud_borne ) then
-             r2h2o2 = r1h2o2*xl        &    ! mole/L(w)/s   * L(w)/fm3(a) = mole/fm3(a)/s
-                  / const0*1.e+6_r8  &    ! correct a bug here ????
-                  / xam
-          else
-             r2h2o2 = r1h2o2*xl  &          ! mole/L(w)/s   * L(w)/fm3(a) = mole/fm3(a)/s
-                  * const0     &          ! mole/fm3(a)/s * 1.e-3       = mole/cm3(a)/s
-                  / xam                   ! /cm3(a)/s    / air-den     = mix-ratio/s
-          endif
-
-          if ( .not. cloud_borne) then    ! this seems to be specific to aerosols that are not cloud borne
-             xh2o2(i,k) = xh2o2(i,k) + r2h2o2*dtime         ! updated h2o2 by het production
-          endif
-
+          r1h2o2 = kh4*ho2s*ho2s                            ! prod(h2o2) in mole/L(w)/s
+          r2h2o2 = r1h2o2 * xl  & ! (mole(h2o2)/L(w)/s) * (L(w)/L(a))
+                  / xam         & ! / (molecule(a)/m3(a))
+                  * AVOGADRO    & ! * (molecule(a)/mole(a))
+                  * M3_TO_L       ! * (L(a)/m3(a)) = mole(h2o2)/mole(a)/s
+          
+          xh2o2(i,k) = xh2o2(i,k) + r2h2o2*dtime ! updated h2o2 by het production
+          
           !-----------------------------------------------
           !       ... Partioning
           !-----------------------------------------------
