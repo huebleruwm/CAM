@@ -257,10 +257,10 @@ contains
     real(r8), parameter :: xa3 = .816e-32_r8
     real(r8), parameter :: xb3 = .259_r8
 
-    real(r8), parameter :: kh0 = 9.e3_r8            ! HO2(g)          -> Ho2(a)
-    real(r8), parameter :: kh1 = 2.05e-5_r8         ! HO2(a)          -> H+ + O2-
-    real(r8), parameter :: kh2 = 8.6e5_r8           ! HO2(a) + ho2(a) -> h2o2(a) + o2
-    real(r8), parameter :: kh3 = 1.e8_r8            ! HO2(a) + o2-    -> h2o2(a) + o2
+    real(r8), parameter :: kh0 = 690.0_r8          ! HO2(g)          -> Ho2(a)        Reference: JPL 19-5
+    real(r8), parameter :: kh1 = 1.6e-5_r8         ! HO2(a)          -> H+ + O2-      Reference: JPL 19-5
+    real(r8), parameter :: kh2 = 8.3e5_r8          ! HO2(a) + ho2(a) -> h2o2(a) + o2  Reference: JPL; Bielski et al. 1985
+    real(r8), parameter :: kh3 = 9.7e7_r8          ! HO2(a) + o2-    -> h2o2(a) + o2  Reference: JPL; Bielski et al. 1985
     real(r8), parameter :: Ra = BOLTZMANN * AVOGADRO * M3_TO_L * PASCAL_TO_ATM ! universal constant   (atm)/(M-K)
 
     !
@@ -276,6 +276,8 @@ contains
     real(r8) :: hno3a, nh3a, so2a, h2o2a, co2a, o3a
     real(r8) :: rah2o2, rao3, pso4, ccc
     real(r8) :: cnh3, chno3, com, com1, com2, xra
+    real(r8) :: f_hso3 ! fraction of aqueous S(IV) that's HSO3-
+    real(r8) :: f_so3  ! fraction of aqueous S(IV) that's SO3=
 
     real(r8) :: hno3g(ncol,pver), nh3g(ncol,pver)
     !
@@ -717,6 +719,11 @@ contains
           wrk = xe/xph(i,k)
           heso2(i,k)  = xk*(1._r8 + wrk*(1._r8 + x2/xph(i,k)))
 
+          ! Calculate fraction of total aqueous S(IV) that is HSO3- and SO3=
+          wrk = xe/(xph(i,k)*xph(i,k) + xe*xph(i,k) + xe*x2)
+          f_hso3 = wrk*xph(i,k) ! [HSO3-]/[S(IV)]
+          f_so3  = wrk*x2       !  [SO3=]/[S(IV)]
+
           !-----------------------------------------------------------------
           !          ... nh3
           !-----------------------------------------------------------------
@@ -791,15 +798,19 @@ contains
 
           !------------------------------------------------------------------------
           !       ... S(IV) (HSO3) + H2O2
+          ! Reference: Seinfeld and Pandis textbook (chapter 6);
+          !            original source: Hoffmann and Calvert (1985)
           !------------------------------------------------------------------------
-          rah2o2 = 8.e4_r8 * EXP( -3650._r8*work1(i) )  &
-               / (.1_r8 + xph(i,k))
+          rah2o2 = 7.45e7_r8 * EXP( -4430.0_r8*work1(i) ) * xph(i,k) &
+                   / (1.0_r8 + 13.0_r8*xph(i,k))
 
           !------------------------------------------------------------------------
           !        ... S(IV)+ O3
+          ! Reference: Seinfeld and Pandis textbook (chapter 6);
+          !            original source: Hoffmann and Calvert (1985)
           !------------------------------------------------------------------------
-          rao3   = 4.39e11_r8 * EXP(-4131._r8/tz)  &
-               + 2.56e3_r8  * EXP(-996._r8 /tz) /xph(i,k)
+          rao3   =   3.75e5_r8 * EXP(-5530.0_r8*work1(i)) * f_hso3 &
+                   + 1.59e9_r8 * EXP(-5280.0_r8*work1(i)) * f_so3
 
           !-----------------------------------------------------------------
           !       ... Prediction after aqueous phase
@@ -820,15 +831,8 @@ contains
 
           IF (XL .ge. 1.e-8_r8) THEN    !! WHEN CLOUD IS PRESENTED
 
-             if (cloud_borne) then
-
-                pso4 = rah2o2 * 7.4e4_r8*EXP(6621._r8*work1(i)) * h2o2g * patm &
-                     * 1.23_r8 *EXP(3120._r8*work1(i)) * so2g * patm
-             else
-                pso4 = rah2o2 * heh2o2(i,k) * h2o2g * patm  &
-                     * heso2(i,k)  * so2g  * patm    ! [M/s]
-
-             endif
+             pso4 = rah2o2 * heh2o2(i,k) * h2o2g * patm  &
+                    * f_hso3 * heso2(i,k)  * so2g  * patm  ! [M/s]
 
              pso4 = pso4 & ! [M/s] = [mole/L(w)/s]
                   * xl & ! [mole/L(a)/s]
