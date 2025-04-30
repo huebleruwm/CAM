@@ -705,8 +705,8 @@ contains
           !-----------------------------------------------------------------
           !        ... h2o2
           !-----------------------------------------------------------------
-          xk = dheff(1,heff_id_co2) * exp( dheff(2,heff_id_co2) * work1(i) )
-          xe = dheff(3,heff_id_co2) * exp( dheff(4,heff_id_co2) * work1(i) )
+          xk = dheff(1,heff_id_h2o2) * exp( dheff(2,heff_id_h2o2) * work1(i) )
+          xe = dheff(3,heff_id_h2o2) * exp( dheff(4,heff_id_h2o2) * work1(i) )
           heh2o2(i,k)  = xk*(1._r8 + xe/xph(i,k))
 
           !-----------------------------------------------------------------
@@ -802,7 +802,7 @@ contains
           !            original source: Hoffmann and Calvert (1985)
           !------------------------------------------------------------------------
           rah2o2 = 7.45e7_r8 * EXP( -4430.0_r8*work1(i) ) * xph(i,k) &
-                   / (1.0_r8 + 13.0_r8*xph(i,k))
+                   / (1.0_r8 + 13.0_r8*xph(i,k)) * f_hso3
 
           !------------------------------------------------------------------------
           !        ... S(IV)+ O3
@@ -832,7 +832,7 @@ contains
           IF (XL .ge. 1.e-8_r8) THEN    !! WHEN CLOUD IS PRESENTED
 
              pso4 = rah2o2 * heh2o2(i,k) * h2o2g * patm  &
-                    * f_hso3 * heso2(i,k)  * so2g  * patm  ! [M/s]
+                    * heso2(i,k)  * so2g  * patm  ! [M/s]
 
              pso4 = pso4 & ! [M/s] = [mole/L(w)/s]
                   * xl & ! [mole/L(a)/s]
