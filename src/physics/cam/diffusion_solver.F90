@@ -165,8 +165,6 @@
     use beljaars_drag_cam,   only : do_beljaars
     ! FIXME: This should not be needed
     use air_composition,     only: rairv
-  
-    use phys_control,        only : phys_getopts 
  
   ! Modification : Ideally, we should diffuse 'liquid-ice static energy' (sl), not the dry static energy.
   !                Also, vertical diffusion of cloud droplet number concentration and aerosol number

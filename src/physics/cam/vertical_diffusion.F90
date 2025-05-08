@@ -110,6 +110,7 @@ integer              :: tauresx_idx, tauresy_idx     ! Redisual stress for impli
 character(len=fieldname_len) :: vdiffnam(pcnst)      ! Names of vertical diffusion tendencies
 integer              :: ixcldice, ixcldliq           ! Constituent indices for cloud liquid and ice water
 integer              :: ixnumice, ixnumliq
+integer              :: ixq
 
 integer              :: pblh_idx, tpert_idx, qpert_idx
 
@@ -213,22 +214,22 @@ subroutine vd_register()
   ! Add fields to physics buffer
 
   ! kvt is used by gw_drag.  only needs physpkg scope.
-  call pbuf_add_field('kvt', 'physpkg', dtype_r8, (/pcols,pverp/), kvt_idx)
+  call pbuf_add_field('kvt', 'physpkg', dtype_r8, (/pcols,pverp/), kvt_idx) ! molecular_kinematic_temperature_conductivity_at_interfaces
 
 
   if (eddy_scheme /= 'CLUBB_SGS') then
-     call pbuf_add_field('kvh',      'global', dtype_r8, (/pcols, pverp/), kvh_idx)
+     call pbuf_add_field('kvh',      'global', dtype_r8, (/pcols, pverp/), kvh_idx) ! eddy_heat_diffusivity_at_interfaces
   end if
 
-  call pbuf_add_field('kvm',      'global', dtype_r8, (/pcols, pverp/), kvm_idx )
-  call pbuf_add_field('pblh',     'global', dtype_r8, (/pcols/),        pblh_idx)
-  call pbuf_add_field('tke',      'global', dtype_r8, (/pcols, pverp/), tke_idx)
+  call pbuf_add_field('kvm',      'global', dtype_r8, (/pcols, pverp/), kvm_idx ) ! eddy_momentum_diffusivity_at_interfaces
+  call pbuf_add_field('pblh',     'global', dtype_r8, (/pcols/),        pblh_idx) ! atmosphere_boundary_layer_thickness
+  call pbuf_add_field('tke',      'global', dtype_r8, (/pcols, pverp/), tke_idx) ! specific_turbulent_kinetic_energy_at_interfaces
 
-  call pbuf_add_field('tauresx',  'global', dtype_r8, (/pcols/),        tauresx_idx)
-  call pbuf_add_field('tauresy',  'global', dtype_r8, (/pcols/),        tauresy_idx)
+  call pbuf_add_field('tauresx',  'global', dtype_r8, (/pcols/),        tauresx_idx) ! eastward_reserved_stress_at_surface_on_previous_timestep
+  call pbuf_add_field('tauresy',  'global', dtype_r8, (/pcols/),        tauresy_idx) ! northward_reserved_stress_at_surface_on_previous_timestep
 
-  call pbuf_add_field('tpert', 'global', dtype_r8, (/pcols/),                       tpert_idx)
-  call pbuf_add_field('qpert', 'global', dtype_r8, (/pcols/),                       qpert_idx)
+  call pbuf_add_field('tpert', 'global', dtype_r8, (/pcols/),                       tpert_idx) ! convective_temperature_perturbation_due_to_pbl_eddies
+  call pbuf_add_field('qpert', 'global', dtype_r8, (/pcols/),                       qpert_idx) ! convective_water_vapor_wrt_moist_air_and_condensed_water_perturbation_due_to_pbl_eddies
 
   if (trim(shallow_scheme) == 'UNICON') then
      call pbuf_add_field('qtl_flx',  'global', dtype_r8, (/pcols, pverp/), qtl_flx_idx)
@@ -262,7 +263,7 @@ subroutine vertical_diffusion_init(pbuf2d)
   use cam_history,       only : addfld, add_default, horiz_only
   use cam_history,       only : register_vector_field
   use eddy_diff_cam,     only : eddy_diff_init
-  use hb_diff,           only : init_hb_diff
+  use holtslag_boville_diff, only : holtslag_boville_diff_init
   use molec_diff,        only : init_molec_diff
   use diffusion_solver,  only : init_vdiff, new_fieldlist_vdiff, vdiff_select
   use constituents,      only : cnst_get_ind, cnst_get_type_byind, cnst_name, cnst_get_molec_byind, cnst_ndropmixed
@@ -290,6 +291,9 @@ subroutine vertical_diffusion_init(pbuf2d)
   logical :: history_budget               ! Output tendencies and state variables for CAM4 T, qv, ql, qi
   integer :: history_budget_histfile_num  ! output history file number for budget fields
   logical :: history_waccm                ! output variables of interest for WACCM runs
+
+  character(len=512)   :: errmsg
+  integer              :: errflg
 
   !
   ! add sponge layer vertical diffusion
@@ -351,6 +355,8 @@ subroutine vertical_diffusion_init(pbuf2d)
   call cnst_get_ind( 'NUMLIQ', ixnumliq, abort=.false. )
   call cnst_get_ind( 'NUMICE', ixnumice, abort=.false. )
 
+  call cnst_get_ind( 'Q', ixq ) ! water vapor index in const array.
+
   ! Initialize upper boundary condition module
 
   call ubc_init()
@@ -400,12 +406,32 @@ subroutine vertical_diffusion_init(pbuf2d)
      call eddy_diff_init(pbuf2d, ntop_eddy, nbot_eddy)
   case ( 'HB', 'HBR')
      if( masterproc ) write(iulog,*) 'vertical_diffusion_init: eddy_diffusivity scheme:  Holtslag and Boville'
-     call init_hb_diff(gravit, cpair, ntop_eddy, nbot_eddy, pref_mid, &
-          karman, eddy_scheme)
+
+     call holtslag_boville_diff_init( &
+      amIRoot = masterproc, &
+      iulog   = iulog, &
+      pver    = pver, &
+      karman  = karman, &
+      pref_mid = pref_mid, &
+      is_hbr_pbl_scheme = (eddy_scheme .eq. 'HBR'), &
+      ntop_turb_in = ntop_eddy, &
+      errmsg = errmsg, &
+      errflg = errflg)
+
      call addfld('HB_ri',      (/ 'lev' /),  'A', 'no',  'Richardson Number (HB Scheme), I' )
   case ( 'CLUBB_SGS' )
      do_pbl_diags = .true.
-     call init_hb_diff(gravit, cpair, ntop_eddy, nbot_eddy, pref_mid, karman, eddy_scheme)
+
+     call holtslag_boville_diff_init( &
+      amIRoot = masterproc, &
+      iulog   = iulog, &
+      pver    = pver, &
+      karman  = karman, &
+      pref_mid = pref_mid, &
+      is_hbr_pbl_scheme = (eddy_scheme .eq. 'HBR'), &
+      ntop_turb_in = ntop_eddy, &
+      errmsg = errmsg, &
+      errflg = errflg)
      !
      ! run HB scheme where CLUBB is not active when running cam7 or cam6 physics
      ! else init_hb_diff is called just for diagnostic purposes
@@ -671,7 +697,15 @@ subroutine vertical_diffusion_tend( &
   use trb_mtn_stress_cam,   only : trb_mtn_stress_tend
   use beljaars_drag_cam,    only : beljaars_drag_tend
   use eddy_diff_cam,        only : eddy_diff_tend
-  use hb_diff,              only : compute_hb_diff, compute_hb_free_atm_diff
+
+  ! CCPP-ized HB scheme
+  use holtslag_boville_diff, only: hb_pbl_independent_coefficients_run
+  use holtslag_boville_diff, only: hb_pbl_dependent_coefficients_run
+  use holtslag_boville_diff, only: hb_diff_exchange_coefficients_run
+
+  ! CCPP-ized HB (free atmosphere) scheme
+  use holtslag_boville_diff, only : hb_diff_free_atm_exchange_coefficients_run
+
   use wv_saturation,        only : qsat
   use molec_diff,           only : compute_molec_diff, vd_lu_qdecomp
   use constituents,         only : qmincg, qmin, cnst_type
@@ -856,6 +890,14 @@ subroutine vertical_diffusion_tend( &
 
   logical  :: lq(pcnst)
 
+  ! Temporaries for CCPP-ized HB
+  real(r8) :: s2(pcols,pver)  ! shear squared (HB output) [s-2]
+  real(r8) :: thv(pcols,pver) ! virtual potential temperature [K]
+  real(r8) :: wstar(pcols)    ! convective scale velocity [m s-1]
+  real(r8) :: bge(pcols)      ! buoyancy gradient enhancement
+  character(len=512)   :: errmsg
+  integer              :: errflg
+
   ! ----------------------- !
   ! Main Computation Begins !
   ! ----------------------- !
@@ -989,15 +1031,116 @@ subroutine vertical_diffusion_tend( &
      ! Modification : We may need to use 'taux' instead of 'tautotx' here, for
      !                consistency with the previous HB scheme.
 
+     !REMOVECAM - no longer need this when CAM is retired and pcols no longer exists
+     thv(:,:) = 0._r8
+     ustar(:) = 0._r8
+     khfs(:) = 0._r8
+     kqfs(:) = 0._r8
+     kbfs(:) = 0._r8
+     obklen(:) = 0._r8
+     ri(:,:) = 0._r8
+     s2(:,:) = 0._r8
+     !REMOVECAM_END
+     ! call CCPP-ized HB scheme (piecewise)
+     call hb_pbl_independent_coefficients_run( &
+       ncol      = ncol,                     &
+       pver      = pver,                     &
+       zvir      = zvir,                     &
+       rair      = rair,                     &
+       cpair     = cpair,                    &
+       gravit    = gravit,                   &
+       karman    = karman,                   &
+       exner     = state%exner(:ncol,:pver), &
+       t         = state%t(:ncol,:pver),     &
+       q_wv      = state%q(:ncol,:pver,ixq), &
+       z         = state%zm(:ncol,:pver),    &
+       pmid      = state%pmid(:ncol,:pver),  &
+       u         = state%u(:ncol,:pver),     &
+       v         = state%v(:ncol,:pver),     &
+       taux      = tautotx(:ncol),           &
+       tauy      = tautoty(:ncol),           &
+       shflx     = cam_in%shf(:ncol),        &
+       q_wv_flx  = cam_in%cflx(:ncol,ixq),   &
+       ! Output variables
+       thv       = thv(:ncol,:pver),         &
+       ustar     = ustar(:ncol),             &
+       khfs      = khfs(:ncol),              &
+       kqfs      = kqfs(:ncol),              &
+       kbfs      = kbfs(:ncol),              &
+       obklen    = obklen(:ncol),            &
+       s2        = s2(:ncol,:pver),          &
+       ri        = ri(:ncol,:pver),          &
+       errmsg    = errmsg,                   &
+       errflg    = errflg)
 
-     call compute_hb_diff(ncol                                    , &
-          th        , state%t  , state%q , state%zm , state%zi    , &
-          state%pmid, state%u  , state%v , tautotx  , tautoty     , &
-          cam_in%shf, cam_in%cflx(:,1), obklen  , ustar    , pblh , &
-          kvm       , kvh      , kvq     , cgh      , cgs         , &
-          tpert     , qpert    , cldn    , cam_in%ocnfrac  , tke  , &
-          ri        , &
-          eddy_scheme)
+     !REMOVECAM - no longer need this when CAM is retired and pcols no longer exists
+     pblh(:) = 0._r8
+     wstar(:) = 0._r8
+     bge(:) = 0._r8
+     !REMOVECAM_END
+     call hb_pbl_dependent_coefficients_run( &
+       ncol      = ncol,                                      &
+       pver      = pver,                                      &
+       pverp     = pverp,                                     &
+       gravit    = gravit,                                    &
+       z         = state%zm(:ncol,:pver),                     &
+       zi        = state%zi(:ncol,:pverp),                    &
+       u         = state%u(:ncol,:pver),                      &
+       v         = state%v(:ncol,:pver),                      &
+       cldn      = cldn(:ncol,:pver),                         &
+       ! Inputs from pbl_independent_coefficients
+       thv       = thv(:ncol,:pver),                          &
+       ustar     = ustar(:ncol),                              &
+       kbfs      = kbfs(:ncol),                               &
+       obklen    = obklen(:ncol),                             &
+       ! Output variables
+       pblh      = pblh(:ncol),                               &
+       wstar     = wstar(:ncol),                              &
+       bge       = bge(:ncol),                                &
+       errmsg    = errmsg,                                    &
+       errflg    = errflg)
+
+     !REMOVECAM - no longer need this when CAM is retired and pcols no longer exists
+     kvm(:,:) = 0._r8
+     kvh(:,:) = 0._r8
+     kvq(:,:) = 0._r8
+     cgh(:,:) = 0._r8
+     cgs(:,:) = 0._r8
+     tpert(:) = 0._r8
+     qpert(:) = 0._r8
+     tke(:,:) = 0._r8
+     !REMOVECAM_END
+     call hb_diff_exchange_coefficients_run( &
+       ncol      = ncol,                                      &
+       pver      = pver,                                      &
+       pverp     = pverp,                                     &
+       karman    = karman,                                    &
+       cpair     = cpair,                                     &
+       z         = state%zm(:ncol,:pver),                     &
+       is_hbr_pbl_scheme = (eddy_scheme .eq. 'HBR'),          &
+       ! Input from hb_pbl_independent_coefficients
+       kqfs      = kqfs(:ncol),                               &
+       khfs      = khfs(:ncol),                               &
+       kbfs      = kbfs(:ncol),                               &
+       ustar     = ustar(:ncol),                              &
+       obklen    = obklen(:ncol),                             &
+       s2        = s2(:ncol,:pver),                           &
+       ri        = ri(:ncol,:pver),                           &
+       ! Input from hb_pbl_dependent_coefficients
+       pblh      = pblh(:ncol),                               &
+       wstar     = wstar(:ncol),                              &
+       bge       = bge(:ncol),                                &
+       ! Output variables
+       kvm       = kvm(:ncol,:pver),                          &
+       kvh       = kvh(:ncol,:pver),                          &
+       kvq       = kvq(:ncol,:pver),                          &
+       cgh       = cgh(:ncol,:pver),                          &
+       cgs       = cgs(:ncol,:pver),                          &
+       tpert     = tpert(:ncol),                              &
+       qpert     = qpert(:ncol),                              &
+       tke       = tke(:ncol,:pver),                          &
+       errmsg    = errmsg,                                    &
+       errflg    = errflg)
 
      call outfld( 'HB_ri',          ri,         pcols,   lchnk )
 
@@ -1006,12 +1149,70 @@ subroutine vertical_diffusion_tend( &
     ! run HB scheme where CLUBB is not active when running cam7
     !
     if (do_hb_above_clubb) then
-      call compute_hb_free_atm_diff( ncol          , &
-           th        , state%t  , state%q , state%zm           , &
-           state%pmid, state%u  , state%v , tautotx  , tautoty , &
-           cam_in%shf, cam_in%cflx(:,1), obklen  , ustar       , &
-           kvm       , kvh      , kvq     , cgh      , cgs     , &
-           ri        )
+      !REMOVECAM - no longer need this when CAM is retired and pcols no longer exists
+      thv(:,:) = 0._r8
+      ustar(:) = 0._r8
+      khfs(:) = 0._r8
+      kqfs(:) = 0._r8
+      kbfs(:) = 0._r8
+      obklen(:) = 0._r8
+      s2(:,:) = 0._r8
+      ri(:,:) = 0._r8
+      !REMOVECAM_END
+      ! call CCPP-ized HB scheme (piecewise)
+      call hb_pbl_independent_coefficients_run( &
+        ncol      = ncol,                     &
+        pver      = pver,                     &
+        zvir      = zvir,                     &
+        rair      = rair,                     &
+        cpair     = cpair,                    &
+        gravit    = gravit,                   &
+        karman    = karman,                   &
+        exner     = state%exner(:ncol,:pver), &
+        t         = state%t(:ncol,:pver),     &
+        q_wv      = state%q(:ncol,:pver,1),   & ! FIXME: assumes wv at 1 (need to change to ixq)
+        z         = state%zm(:ncol,:pver),    &
+        pmid      = state%pmid(:ncol,:pver),  &
+        u         = state%u(:ncol,:pver),     &
+        v         = state%v(:ncol,:pver),     &
+        taux      = tautotx(:ncol),           &
+        tauy      = tautoty(:ncol),           &
+        shflx     = cam_in%shf(:ncol),        &
+        q_wv_flx  = cam_in%cflx(:ncol,1),     & ! FIXME: assumes wv at 1 (need to change to ixq)
+        ! Output variables
+        thv       = thv(:ncol,:pver),         &
+        ustar     = ustar(:ncol),             &
+        khfs      = khfs(:ncol),              &
+        kqfs      = kqfs(:ncol),              &
+        kbfs      = kbfs(:ncol),              &
+        obklen    = obklen(:ncol),            &
+        s2        = s2(:ncol,:pver),          &
+        ri        = ri(:ncol,:pver),          &
+        errmsg    = errmsg,                   &
+        errflg    = errflg)
+
+      !REMOVECAM - no longer need this when CAM is retired and pcols no longer exists
+      kvm(:,:) = 0._r8
+      kvh(:,:) = 0._r8
+      kvq(:,:) = 0._r8
+      cgh(:,:) = 0._r8
+      cgs(:,:) = 0._r8
+      !REMOVECAM_END
+      call hb_diff_free_atm_exchange_coefficients_run( &
+        ncol      = ncol,                                      &
+        pver      = pver,                                      &
+        pverp     = pverp,                                     &
+        ! Input from hb_pbl_independent_coefficients
+        s2        = s2(:ncol,:pver),                           &
+        ri        = ri(:ncol,:pver),                           &
+        ! Output variables
+        kvm       = kvm(:ncol,:pver),                          &
+        kvh       = kvh(:ncol,:pver),                          &
+        kvq       = kvq(:ncol,:pver),                          &
+        cgh       = cgh(:ncol,:pver),                          &
+        cgs       = cgs(:ncol,:pver),                          &
+        errmsg    = errmsg,                                    &
+        errflg    = errflg)
 
       call pbuf_get_field(pbuf, clubbtop_idx, clubbtop)
       !
@@ -1161,21 +1362,59 @@ subroutine vertical_diffusion_tend( &
              mw_fac, nbot_molec)
      end if
 
-     call compute_vdiff( state%lchnk   ,                                                                     &
-          pcols         , pver               , pcnst        , ncol          , tint          , &
-          p    , state%t      , rhoi, ztodt         , taux          , &
-          tauy          , shflux             , cflux        , &
-          kvh           , kvm                , kvq          , cgs           , cgh           , &
-          state%zi      , ksrftms            , dragblj      , &
-          qmincg       , fieldlist_wet , fieldlist_molec,&
-          u_tmp         , v_tmp              , q_tmp        , s_tmp         ,                 &
-          tautmsx       , tautmsy            , dtk          , topflx        , errstring     , &
-          tauresx       , tauresy            , 1            , cpairv(:,:,state%lchnk), dse_top, &
-          do_molec_diff, waccmx_mode, &
-          vd_lu_qdecomp, &
-          ubc_mmr, ubc_flux, kvt, state%pmid, &
-          cnst_mw, cnst_fixed_ubc, cnst_fixed_ubflx, nbot_molec, &
-          kq_scal, mw_fac)
+     call compute_vdiff( &
+          lchnk           = state%lchnk,                                   &
+          pcols           = pcols,                                         &
+          pver            = pver,                                          &
+          ncnst           = pcnst,                                         &
+          ncol            = ncol,                                          &
+          tint            = tint,                                          &
+          p               = p,                                             &
+          t               = state%t,                                       &
+          rhoi            = rhoi,                                          &
+          ztodt           = ztodt,                                         &
+          taux            = taux,                                          &
+          tauy            = tauy,                                          &
+          shflx           = shflux,                                        &
+          cflx            = cflux,                                         &
+          kvh             = kvh,                                           &
+          kvm             = kvm,                                           &
+          kvq             = kvq,                                           &
+          cgs             = cgs,                                           &
+          cgh             = cgh,                                           &
+          zi              = state%zi,                                      &
+          ksrftms         = ksrftms,                                       &
+          dragblj         = dragblj,                                       &
+          qmincg          = qmincg,                                        &
+          fieldlist       = fieldlist_wet,                                 &
+          fieldlistm      = fieldlist_molec,                               &
+          u               = u_tmp,                                         &
+          v               = v_tmp,                                         &
+          q               = q_tmp,                                         &
+          dse             = s_tmp,                                         &
+          tautmsx         = tautmsx,                                       &
+          tautmsy         = tautmsy,                                       &
+          dtk             = dtk,                                           &
+          topflx          = topflx,                                        &
+          errstring       = errstring,                                     &
+          tauresx         = tauresx,                                       &
+          tauresy         = tauresy,                                       &
+          itaures         = 1,                                             &
+          cpairv          = cpairv(:,:,state%lchnk),                       &
+          dse_top         = dse_top,                                       &
+          do_molec_diff   = do_molec_diff,                                 &
+          use_temperature_molec_diff = waccmx_mode,                        &
+          vd_lu_qdecomp   = vd_lu_qdecomp,                                 &
+          ubc_mmr         = ubc_mmr,                                       &
+          ubc_flux        = ubc_flux,                                      &
+          kvt             = kvt,                                           &
+          pmid            = state%pmid,                                    &
+          cnst_mw         = cnst_mw,                                       &
+          cnst_fixed_ubc  = cnst_fixed_ubc,                                &
+          cnst_fixed_ubflx = cnst_fixed_ubflx,                             &
+          nbot_molec      = nbot_molec,                                    &
+          kq_scal         = kq_scal,                                       &
+          mw_fac          = mw_fac)
 
      call handle_errmsg(errstring, subname="compute_vdiff", &
           extra_msg="Error in fieldlist_wet call from vertical_diffusion.")
@@ -1194,21 +1433,59 @@ subroutine vertical_diffusion_tend( &
              mw_fac, nbot_molec)
      end if
 
-     call compute_vdiff( state%lchnk   ,                                                                     &
-          pcols         , pver               , pcnst        , ncol          , tint          , &
-          p_dry , state%t      , rhoi_dry,  ztodt         , taux          , &
-          tauy          , shflux             , cflux        , &
-          kvh           , kvm                , kvq          , cgs           , cgh           , &
-          state%zi      , ksrftms            , dragblj      , &
-          qmincg       , fieldlist_dry , fieldlist_molec,&
-          u_tmp         , v_tmp              , q_tmp        , s_tmp         ,                 &
-          tautmsx_temp  , tautmsy_temp       , dtk_temp     , topflx_temp   , errstring     , &
-          tauresx       , tauresy            , 1            , cpairv(:,:,state%lchnk), dse_top, &
-          do_molec_diff , waccmx_mode, &
-          vd_lu_qdecomp, &
-          ubc_mmr, ubc_flux, kvt, state%pmiddry, &
-          cnst_mw, cnst_fixed_ubc, cnst_fixed_ubflx, nbot_molec, &
-          kq_scal, mw_fac)
+     call compute_vdiff( &
+          lchnk           = state%lchnk,                                   &
+          pcols           = pcols,                                         &
+          pver            = pver,                                          &
+          ncnst           = pcnst,                                         &
+          ncol            = ncol,                                          &
+          tint            = tint,                                          &
+          p               = p_dry,                                         &
+          t               = state%t,                                       &
+          rhoi            = rhoi_dry,                                      &
+          ztodt           = ztodt,                                         &
+          taux            = taux,                                          &
+          tauy            = tauy,                                          &
+          shflx           = shflux,                                        &
+          cflx            = cflux,                                         &
+          kvh             = kvh,                                           &
+          kvm             = kvm,                                           &
+          kvq             = kvq,                                           &
+          cgs             = cgs,                                           &
+          cgh             = cgh,                                           &
+          zi              = state%zi,                                      &
+          ksrftms         = ksrftms,                                       &
+          dragblj         = dragblj,                                       &
+          qmincg          = qmincg,                                        &
+          fieldlist       = fieldlist_dry,                                 &
+          fieldlistm      = fieldlist_molec,                               &
+          u               = u_tmp,                                         &
+          v               = v_tmp,                                         &
+          q               = q_tmp,                                         &
+          dse             = s_tmp,                                         &
+          tautmsx         = tautmsx_temp,                                  &
+          tautmsy         = tautmsy_temp,                                  &
+          dtk             = dtk_temp,                                      &
+          topflx          = topflx_temp,                                   &
+          errstring       = errstring,                                     &
+          tauresx         = tauresx,                                       &
+          tauresy         = tauresy,                                       &
+          itaures         = 1,                                             &
+          cpairv          = cpairv(:,:,state%lchnk),                       &
+          dse_top         = dse_top,                                       &
+          do_molec_diff   = do_molec_diff,                                 &
+          use_temperature_molec_diff = waccmx_mode,                        &
+          vd_lu_qdecomp   = vd_lu_qdecomp,                                 &
+          ubc_mmr         = ubc_mmr,                                       &
+          ubc_flux        = ubc_flux,                                      &
+          kvt             = kvt,                                           &
+          pmid            = state%pmiddry,                                 &
+          cnst_mw         = cnst_mw,                                       &
+          cnst_fixed_ubc  = cnst_fixed_ubc,                                &
+          cnst_fixed_ubflx = cnst_fixed_ubflx,                             &
+          nbot_molec      = nbot_molec,                                    &
+          kq_scal         = kq_scal,                                       &
+          mw_fac          = mw_fac)
 
      call handle_errmsg(errstring, subname="compute_vdiff", &
           extra_msg="Error in fieldlist_dry call from vertical_diffusion.")
