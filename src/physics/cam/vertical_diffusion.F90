@@ -711,6 +711,7 @@ subroutine vertical_diffusion_tend( &
   use constituents,         only : qmincg, qmin, cnst_type
   use diffusion_solver,     only : compute_vdiff, any, operator(.not.)
   use air_composition,      only : cpairv, rairv !Needed for calculation of upward H flux
+  use air_composition,      only : mbarv
   use time_manager,         only : get_nstep
   use constituents,         only : cnst_get_type_byind, cnst_name, &
                                    cnst_mw, cnst_fixed_ubc, cnst_fixed_ubflx, cnst_ndropmixed
@@ -815,8 +816,8 @@ subroutine vertical_diffusion_tend( &
   ! for obklen calculation outside HB
   real(r8) :: thvs(pcols)                                         ! Virtual potential temperature at surface
   real(r8) :: rrho(pcols)                                         ! Reciprocal of density at surface
-  real(r8) :: khfs(pcols)                                         ! sfc kinematic heat flux [mK/s]
-  real(r8) :: kqfs(pcols)                                         ! sfc kinematic water vapor flux [m/s]
+  real(r8) :: khfs(pcols)                                         ! sfc kinematic heat flux [K m s-1]
+  real(r8) :: kqfs(pcols)                                         ! sfc kinematic water vapor flux [kg kg-1 m s-1]
   real(r8) :: kbfs(pcols)                                         ! sfc kinematic buoyancy flux [m^2/s^3]
 
   real(r8) :: ftem(pcols,pver)                                    ! Saturation vapor pressure before PBL
@@ -1131,14 +1132,14 @@ subroutine vertical_diffusion_tend( &
        wstar     = wstar(:ncol),                              &
        bge       = bge(:ncol),                                &
        ! Output variables
-       kvm       = kvm(:ncol,:pver),                          &
-       kvh       = kvh(:ncol,:pver),                          &
-       kvq       = kvq(:ncol,:pver),                          &
-       cgh       = cgh(:ncol,:pver),                          &
-       cgs       = cgs(:ncol,:pver),                          &
+       kvm       = kvm(:ncol,:pverp),                         &
+       kvh       = kvh(:ncol,:pverp),                         &
+       kvq       = kvq(:ncol,:pverp),                         &
+       cgh       = cgh(:ncol,:pverp),                         &
+       cgs       = cgs(:ncol,:pverp),                         &
        tpert     = tpert(:ncol),                              &
        qpert     = qpert(:ncol),                              &
-       tke       = tke(:ncol,:pver),                          &
+       tke       = tke(:ncol,:pverp),                         &
        errmsg    = errmsg,                                    &
        errflg    = errflg)
 
@@ -1170,7 +1171,7 @@ subroutine vertical_diffusion_tend( &
         karman    = karman,                   &
         exner     = state%exner(:ncol,:pver), &
         t         = state%t(:ncol,:pver),     &
-        q_wv      = state%q(:ncol,:pver,1),   & ! FIXME: assumes wv at 1 (need to change to ixq)
+        q_wv      = state%q(:ncol,:pver,1),   & ! NOTE: assumes wv at 1 (need to change to ixq?)
         z         = state%zm(:ncol,:pver),    &
         pmid      = state%pmid(:ncol,:pver),  &
         u         = state%u(:ncol,:pver),     &
@@ -1178,7 +1179,7 @@ subroutine vertical_diffusion_tend( &
         taux      = tautotx(:ncol),           &
         tauy      = tautoty(:ncol),           &
         shflx     = cam_in%shf(:ncol),        &
-        q_wv_flx  = cam_in%cflx(:ncol,1),     & ! FIXME: assumes wv at 1 (need to change to ixq)
+        q_wv_flx  = cam_in%cflx(:ncol,1),     & ! NOTE: assumes wv at 1 (need to change to ixq?)
         ! Output variables
         thv       = thv(:ncol,:pver),         &
         ustar     = ustar(:ncol),             &
@@ -1206,11 +1207,11 @@ subroutine vertical_diffusion_tend( &
         s2        = s2(:ncol,:pver),                           &
         ri        = ri(:ncol,:pver),                           &
         ! Output variables
-        kvm       = kvm(:ncol,:pver),                          &
-        kvh       = kvh(:ncol,:pver),                          &
-        kvq       = kvq(:ncol,:pver),                          &
-        cgh       = cgh(:ncol,:pver),                          &
-        cgs       = cgs(:ncol,:pver),                          &
+        kvm       = kvm(:ncol,:pverp),                         &
+        kvh       = kvh(:ncol,:pverp),                         &
+        kvq       = kvq(:ncol,:pverp),                         &
+        cgh       = cgh(:ncol,:pverp),                         &
+        cgs       = cgs(:ncol,:pverp),                         &
         errmsg    = errmsg,                                    &
         errflg    = errflg)
 
@@ -1363,58 +1364,62 @@ subroutine vertical_diffusion_tend( &
      end if
 
      call compute_vdiff( &
-          lchnk           = state%lchnk,                                   &
-          pcols           = pcols,                                         &
-          pver            = pver,                                          &
-          ncnst           = pcnst,                                         &
           ncol            = ncol,                                          &
-          tint            = tint,                                          &
-          p               = p,                                             &
-          t               = state%t,                                       &
-          rhoi            = rhoi,                                          &
+          pver            = pver,                                          &
+          pverp           = pverp,                                         &
+          ncnst           = pcnst,                                         &
           ztodt           = ztodt,                                         &
-          taux            = taux,                                          &
-          tauy            = tauy,                                          &
-          shflx           = shflux,                                        &
-          cflx            = cflux,                                         &
-          kvh             = kvh,                                           &
-          kvm             = kvm,                                           &
-          kvq             = kvq,                                           &
-          cgs             = cgs,                                           &
-          cgh             = cgh,                                           &
-          zi              = state%zi,                                      &
-          ksrftms         = ksrftms,                                       &
-          dragblj         = dragblj,                                       &
-          qmincg          = qmincg,                                        &
           fieldlist       = fieldlist_wet,                                 &
           fieldlistm      = fieldlist_molec,                               &
-          u               = u_tmp,                                         &
-          v               = v_tmp,                                         &
-          q               = q_tmp,                                         &
-          dse             = s_tmp,                                         &
-          tautmsx         = tautmsx,                                       &
-          tautmsy         = tautmsy,                                       &
-          dtk             = dtk,                                           &
-          topflx          = topflx,                                        &
-          errstring       = errstring,                                     &
-          tauresx         = tauresx,                                       &
-          tauresy         = tauresy,                                       &
-          itaures         = 1,                                             &
-          cpairv          = cpairv(:,:,state%lchnk),                       &
-          dse_top         = dse_top,                                       &
+          itaures         = .true.,                                        &
+          t               = state%t(:ncol,:pver),                          &
+          tint            = tint(:ncol,:pverp),                            &
+          p               = p,                                             & ! Coords1D, pressure coordinates [Pa]
+          rhoi            = rhoi(:ncol,:pverp),                            &
+          taux            = taux(:ncol),                                   &
+          tauy            = tauy(:ncol),                                   &
+          shflx           = shflux(:ncol),                                 &
+          cflx            = cflux(:ncol,:pcnst),                           &
+          dse_top         = dse_top(:ncol),                                &
+          kvh             = kvh(:ncol,:pverp),                             &
+          kvm             = kvm(:ncol,:pverp),                             &
+          kvq             = kvq(:ncol,:pverp),                             &
+          cgs             = cgs(:ncol,:pverp),                             &
+          cgh             = cgh(:ncol,:pverp),                             &
+          zi              = state%zi(:ncol,:pverp),                        &
+          ksrftms         = ksrftms(:ncol),                                &
+          dragblj         = dragblj(:ncol,:pver),                          &
+          qmincg          = qmincg(:pcnst),                                &
+          ! input/output
+          u               = u_tmp(:ncol,:pver),                            &
+          v               = v_tmp(:ncol,:pver),                            &
+          q               = q_tmp(:ncol,:pver,:pcnst),                     &
+          dse             = s_tmp(:ncol,:pver),                            &
+          tauresx         = tauresx(:ncol),                                &
+          tauresy         = tauresy(:ncol),                                &
+          ! below output
+          dtk             = dtk(:ncol,:),                                  &
+          tautmsx         = tautmsx(:ncol),                                &
+          tautmsy         = tautmsy(:ncol),                                &
+          topflx          = topflx(:ncol),                                 &
+          errmsg          = errstring,                                     &
+          ! arguments for molecular diffusion only.
           do_molec_diff   = do_molec_diff,                                 &
           use_temperature_molec_diff = waccmx_mode,                        &
+          cpairv          = cpairv(:ncol,:,state%lchnk),                   &
+          rairv           = rairv(:ncol,:,state%lchnk),                    &
+          mbarv           = mbarv(:ncol,:,state%lchnk),                    &
           vd_lu_qdecomp   = vd_lu_qdecomp,                                 &
-          ubc_mmr         = ubc_mmr,                                       &
-          ubc_flux        = ubc_flux,                                      &
-          kvt             = kvt,                                           &
-          pmid            = state%pmid,                                    &
-          cnst_mw         = cnst_mw,                                       &
-          cnst_fixed_ubc  = cnst_fixed_ubc,                                &
-          cnst_fixed_ubflx = cnst_fixed_ubflx,                             &
+          ubc_mmr         = ubc_mmr(:ncol,:pcnst),                         &
+          ubc_flux        = ubc_flux(:ncol,:pcnst),                        &
+          kvt             = kvt(:ncol,:pverp),                             &
+          pmid            = state%pmid(:ncol,:pver),                       &
+          cnst_mw         = cnst_mw(:pcnst),                               &
+          cnst_fixed_ubc  = cnst_fixed_ubc(:pcnst),                        &
+          cnst_fixed_ubflx= cnst_fixed_ubflx(:pcnst),                      &
           nbot_molec      = nbot_molec,                                    &
-          kq_scal         = kq_scal,                                       &
-          mw_fac          = mw_fac)
+          kq_scal         = kq_scal(:ncol,:pverp),                         &
+          mw_fac          = mw_fac(:ncol,:pverp,:pcnst))
 
      call handle_errmsg(errstring, subname="compute_vdiff", &
           extra_msg="Error in fieldlist_wet call from vertical_diffusion.")
@@ -1434,58 +1439,62 @@ subroutine vertical_diffusion_tend( &
      end if
 
      call compute_vdiff( &
-          lchnk           = state%lchnk,                                   &
-          pcols           = pcols,                                         &
-          pver            = pver,                                          &
-          ncnst           = pcnst,                                         &
           ncol            = ncol,                                          &
-          tint            = tint,                                          &
-          p               = p_dry,                                         &
-          t               = state%t,                                       &
-          rhoi            = rhoi_dry,                                      &
+          pver            = pver,                                          &
+          pverp           = pverp,                                         &
+          ncnst           = pcnst,                                         &
           ztodt           = ztodt,                                         &
-          taux            = taux,                                          &
-          tauy            = tauy,                                          &
-          shflx           = shflux,                                        &
-          cflx            = cflux,                                         &
-          kvh             = kvh,                                           &
-          kvm             = kvm,                                           &
-          kvq             = kvq,                                           &
-          cgs             = cgs,                                           &
-          cgh             = cgh,                                           &
-          zi              = state%zi,                                      &
-          ksrftms         = ksrftms,                                       &
-          dragblj         = dragblj,                                       &
-          qmincg          = qmincg,                                        &
           fieldlist       = fieldlist_dry,                                 &
           fieldlistm      = fieldlist_molec,                               &
-          u               = u_tmp,                                         &
-          v               = v_tmp,                                         &
-          q               = q_tmp,                                         &
-          dse             = s_tmp,                                         &
-          tautmsx         = tautmsx_temp,                                  &
-          tautmsy         = tautmsy_temp,                                  &
-          dtk             = dtk_temp,                                      &
-          topflx          = topflx_temp,                                   &
-          errstring       = errstring,                                     &
-          tauresx         = tauresx,                                       &
-          tauresy         = tauresy,                                       &
-          itaures         = 1,                                             &
-          cpairv          = cpairv(:,:,state%lchnk),                       &
-          dse_top         = dse_top,                                       &
+          itaures         = .true.,                                        &
+          t               = state%t(:ncol,:pver),                          &
+          tint            = tint(:ncol,:pverp),                            &
+          p               = p_dry,                                         & ! Coords1D, pressure coordinates [Pa]
+          rhoi            = rhoi_dry(:ncol,:pverp),                        &
+          taux            = taux(:ncol),                                   &
+          tauy            = tauy(:ncol),                                   &
+          shflx           = shflux(:ncol),                                 &
+          cflx            = cflux(:ncol,:pcnst),                           &
+          dse_top         = dse_top(:ncol),                                &
+          kvh             = kvh(:ncol,:pverp),                             &
+          kvm             = kvm(:ncol,:pverp),                             &
+          kvq             = kvq(:ncol,:pverp),                             &
+          cgs             = cgs(:ncol,:pverp),                             &
+          cgh             = cgh(:ncol,:pverp),                             &
+          zi              = state%zi(:ncol,:pverp),                        &
+          ksrftms         = ksrftms(:ncol),                                &
+          dragblj         = dragblj(:ncol,:pver),                          &
+          qmincg          = qmincg(:pcnst),                                &
+          ! input/output
+          u               = u_tmp(:ncol,:pver),                            &
+          v               = v_tmp(:ncol,:pver),                            &
+          q               = q_tmp(:ncol,:pver,:pcnst),                     &
+          dse             = s_tmp(:ncol,:pver),                            &
+          tauresx         = tauresx(:ncol),                                &
+          tauresy         = tauresy(:ncol),                                &
+          ! below output
+          dtk             = dtk_temp(:ncol,:),                             &
+          tautmsx         = tautmsx_temp(:ncol),                           &
+          tautmsy         = tautmsy_temp(:ncol),                           &
+          topflx          = topflx_temp(:ncol),                            &
+          errmsg          = errstring,                                     &
+          ! arguments for molecular diffusion only.
           do_molec_diff   = do_molec_diff,                                 &
           use_temperature_molec_diff = waccmx_mode,                        &
+          cpairv          = cpairv(:ncol,:,state%lchnk),                   &
+          rairv           = rairv(:ncol,:,state%lchnk),                    &
+          mbarv           = mbarv(:ncol,:,state%lchnk),                    &
           vd_lu_qdecomp   = vd_lu_qdecomp,                                 &
-          ubc_mmr         = ubc_mmr,                                       &
-          ubc_flux        = ubc_flux,                                      &
-          kvt             = kvt,                                           &
-          pmid            = state%pmiddry,                                 &
-          cnst_mw         = cnst_mw,                                       &
-          cnst_fixed_ubc  = cnst_fixed_ubc,                                &
-          cnst_fixed_ubflx = cnst_fixed_ubflx,                             &
+          ubc_mmr         = ubc_mmr(:ncol,:pcnst),                         &
+          ubc_flux        = ubc_flux(:ncol,:pcnst),                        &
+          kvt             = kvt(:ncol,:pverp),                             &
+          pmid            = state%pmiddry(:ncol,:pver),                    &
+          cnst_mw         = cnst_mw(:pcnst),                               &
+          cnst_fixed_ubc  = cnst_fixed_ubc(:pcnst),                        &
+          cnst_fixed_ubflx= cnst_fixed_ubflx(:pcnst),                      &
           nbot_molec      = nbot_molec,                                    &
-          kq_scal         = kq_scal,                                       &
-          mw_fac          = mw_fac)
+          kq_scal         = kq_scal(:ncol,:pverp),                         &
+          mw_fac          = mw_fac(:ncol,:pverp,:pcnst))
 
      call handle_errmsg(errstring, subname="compute_vdiff", &
           extra_msg="Error in fieldlist_dry call from vertical_diffusion.")

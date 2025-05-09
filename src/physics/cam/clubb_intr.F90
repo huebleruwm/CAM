@@ -2599,6 +2599,10 @@ end subroutine clubb_init_cnst
       edsclr, &
       n
 
+    ! dummy outputs for CCPP-ized subroutines
+    character(len=512)   :: errmsg
+    integer              :: errflg
+
 #endif
 
   call t_startf('clubb_tend_cam')
@@ -4714,12 +4718,12 @@ end subroutine clubb_init_cnst
       pver      = pver,                                      &
       pverp     = pverp,                                     &
       gravit    = gravit,                                    &
-      z         = state%zm(:ncol,:pver),                     &
-      zi        = state%zi(:ncol,:pverp),                    &
-      u         = state%u(:ncol,:pver),                      &
-      v         = state%v(:ncol,:pver),                      &
-      cldn      = cldn(:ncol,:pver),                         &
-      ! Inputs from CLUBB (and not HB)
+      z         = state1%zm(:ncol,:pver),                    &
+      zi        = state1%zi(:ncol,:pverp),                   &
+      u         = state1%u(:ncol,:pver),                     &
+      v         = state1%v(:ncol,:pver),                     &
+      cldn      = cloud_frac(:ncol,:pver),                   &
+      ! Inputs from CLUBB (not HB coefficients)
       thv       = thv(:ncol,:pver),                          &
       ustar     = ustar2(:ncol),                             &
       kbfs      = kbfs(:ncol),                               &
