@@ -434,6 +434,7 @@ subroutine compute_eddy_diff( pbuf, lchnk  ,                                    
   use wv_saturation,        only: qsat
   use eddy_diff,            only: trbintd, caleddy
   use physics_buffer,       only: pbuf_get_field
+  use beljaars_drag_cam,    only: do_beljaars
 
   ! --------------- !
   ! Input Variables !
@@ -794,9 +795,11 @@ subroutine compute_eddy_diff( pbuf, lchnk  ,                                    
         ufd(:ncol,:)   = u(:ncol,:)
         vfd(:ncol,:)   = v(:ncol,:)
 
+        ! TODO (hplin, 5/9/2025): after these are subset to ncol check if we
+        ! need to initialize some outs to 0; compute_vdiff did not do this before
+
         ! Diffuse initial profile of each time step using a given (kvh_out,kvm_out)
         ! In the below 'compute_vdiff', (slfd,qtfd,ufd,vfd) are 'inout' variables.
-
         call compute_vdiff( &
                    ncol            = ncol,                                          &
                    pver            = pver,                                          &
@@ -820,7 +823,6 @@ subroutine compute_eddy_diff( pbuf, lchnk  ,                                    
                    kvq             = kvh_out(:ncol,:pverp),                         & ! [sic] kvh_out is assigned to kvh, kvq
                    cgs             = cgs(:ncol,:pverp),                             &
                    cgh             = cgh(:ncol,:pverp),                             &
-                   zi              = zi(:ncol,:pverp),                              &
                    ksrftms         = ksrftms(:ncol),                                &
                    dragblj         = dragblj(:ncol,:pver),                          &
                    qmincg          = zero,                                          &
@@ -837,6 +839,8 @@ subroutine compute_eddy_diff( pbuf, lchnk  ,                                    
                    tautmsy         = jnk1d(:ncol),                                  &
                    topflx          = jnk1d(:ncol),                                  &
                    errmsg          = errstring,                                     &
+                   ! arguments for Beljaars
+                   do_beljaars     = do_beljaars,                                   &
                    ! arguments for molecular diffusion only.
                    do_molec_diff   = .false.,                                       &
                    use_temperature_molec_diff = .false.,                            &

@@ -134,13 +134,14 @@
                             p               , t                  , rhoi          , ztodt        , taux        , &
                             tauy            , shflx              , cflx          , &
                             kvh             , kvm                , kvq           , cgs          , cgh         , &
-                            zi              , ksrftms            , dragblj       , &
+                            ksrftms            , dragblj       , &
                             qmincg          , fieldlist          , fieldlistm    , &
                             u               , v                  , q             , dse          ,               &
                             tautmsx         , tautmsy            , dtk           , topflx       , errmsg   , &
                             tauresx         , tauresy            , itaures       , &
                             cpairv, rairv, mbarv, &
                             dse_top, &
+                            do_beljaars, &
                             do_molec_diff   , use_temperature_molec_diff, vd_lu_qdecomp, &
                             ubc_mmr, ubc_flux, kvt, pmid, &
                             cnst_mw, cnst_fixed_ubc, cnst_fixed_ubflx, nbot_molec, &
@@ -163,7 +164,6 @@
          BoundaryData, BoundaryFlux, TriDiagDecomp
     use vdiff_lu_solver,     only : fin_vol_lu_decomp
     use vertical_diffusion_solver, only : fin_vol_solve
-    use beljaars_drag_cam,   only : do_beljaars
  
   ! Modification : Ideally, we should diffuse 'liquid-ice static energy' (sl), not the dry static energy.
   !                Also, vertical diffusion of cloud droplet number concentration and aerosol number
@@ -191,7 +191,6 @@
                                              ! Input v-momentum per unit time per unit area into the atmosphere [ N/m2 ]
     real(r8), intent(in) :: shflx(:)         ! Surface sensible heat flux [ W/m2 ]
     real(r8), intent(in) :: cflx(:,:)        ! Surface constituent flux [ kg/m2/s ] (ncol,ncnst)
-    real(r8), intent(in) :: zi(:,:)          ! Interface heights [ m ]
     real(r8), intent(in) :: ksrftms(:)       ! Surface drag coefficient for turbulent mountain stress. > 0. [ kg/s/m2 ]
     real(r8), intent(in) :: dragblj(:,:)     ! Drag profile from Beljaars SGO form drag  > 0. [ 1/s ]
     real(r8), intent(in) :: qmincg(:)        ! Minimum constituent mixing ratios from cg fluxes, (ncnst)
@@ -223,6 +222,9 @@
                                              ! [ N/m2 = kg m/s /s/m2 ]
     real(r8), intent(out)   :: topflx(:)     ! Molecular heat flux at the top interface
     character(128), intent(out) :: errmsg    ! Output status
+
+    ! Enable Beljaars drag?
+    logical,  intent(in)    :: do_beljaars   ! Flag indicating Beljaars drag
 
     ! Molecular Diffusion Arguments - mostly optional
     logical,  intent(in)    :: do_molec_diff             ! Flag indicating multiple constituent diffusivities

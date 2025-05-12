@@ -50,7 +50,7 @@ module vertical_diffusion
 ! S. Park     : Aug. 2006, Dec. 2008. Jan. 2010                                                        !
 !----------------------------------------------------------------------------------------------------- !
 
-use shr_kind_mod,     only : r8 => shr_kind_r8, i4=> shr_kind_i4
+use shr_kind_mod,     only : r8 => shr_kind_r8
 use ppgrid,           only : pcols, pver, pverp
 use constituents,     only : pcnst
 use diffusion_solver, only : vdiff_selector
@@ -284,7 +284,7 @@ subroutine vertical_diffusion_init(pbuf2d)
 
   real(r8), parameter :: ntop_eddy_pres = 1.e-7_r8 ! Pressure below which eddy diffusion is not done in WACCM-X. (Pa)
 
-  integer :: im, l, m, nmodes, nspec, ierr
+  integer :: ierr
 
   logical :: history_amwg                 ! output the variables used by the AMWG diag package
   logical :: history_eddy                 ! output the eddy variables
@@ -695,7 +695,7 @@ subroutine vertical_diffusion_tend( &
   use cam_history,          only : outfld
 
   use trb_mtn_stress_cam,   only : trb_mtn_stress_tend
-  use beljaars_drag_cam,    only : beljaars_drag_tend
+  use beljaars_drag_cam,    only : beljaars_drag_tend, do_beljaars
   use eddy_diff_cam,        only : eddy_diff_tend
 
   ! CCPP-ized HB scheme
@@ -723,7 +723,6 @@ subroutine vertical_diffusion_tend( &
   use upper_bc,             only : ubc_get_flxs
   use coords_1d,            only : Coords1D
   use phys_control,         only : cam_physpkg_is
-  use ref_pres,             only : ptop_ref
 
   ! --------------- !
   ! Input Arguments !
@@ -1386,7 +1385,6 @@ subroutine vertical_diffusion_tend( &
           kvq             = kvq(:ncol,:pverp),                             &
           cgs             = cgs(:ncol,:pverp),                             &
           cgh             = cgh(:ncol,:pverp),                             &
-          zi              = state%zi(:ncol,:pverp),                        &
           ksrftms         = ksrftms(:ncol),                                &
           dragblj         = dragblj(:ncol,:pver),                          &
           qmincg          = qmincg(:pcnst),                                &
@@ -1403,6 +1401,8 @@ subroutine vertical_diffusion_tend( &
           tautmsy         = tautmsy(:ncol),                                &
           topflx          = topflx(:ncol),                                 &
           errmsg          = errstring,                                     &
+          ! arguments for Beljaars
+          do_beljaars     = do_beljaars,                                   &
           ! arguments for molecular diffusion only.
           do_molec_diff   = do_molec_diff,                                 &
           use_temperature_molec_diff = waccmx_mode,                        &
@@ -1461,7 +1461,6 @@ subroutine vertical_diffusion_tend( &
           kvq             = kvq(:ncol,:pverp),                             &
           cgs             = cgs(:ncol,:pverp),                             &
           cgh             = cgh(:ncol,:pverp),                             &
-          zi              = state%zi(:ncol,:pverp),                        &
           ksrftms         = ksrftms(:ncol),                                &
           dragblj         = dragblj(:ncol,:pver),                          &
           qmincg          = qmincg(:pcnst),                                &
@@ -1478,6 +1477,8 @@ subroutine vertical_diffusion_tend( &
           tautmsy         = tautmsy_temp(:ncol),                           &
           topflx          = topflx_temp(:ncol),                            &
           errmsg          = errstring,                                     &
+          ! arguments for Beljaars
+          do_beljaars     = do_beljaars,                                   &
           ! arguments for molecular diffusion only.
           do_molec_diff   = do_molec_diff,                                 &
           use_temperature_molec_diff = waccmx_mode,                        &
