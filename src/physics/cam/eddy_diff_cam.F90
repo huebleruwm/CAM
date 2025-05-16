@@ -5,7 +5,6 @@ use ppgrid, only: pcols, pver, pverp
 use cam_logfile, only: iulog
 use cam_abortutils, only: endrun
 use physconst, only: gravit, cpair, rair, zvir, latvap, latice, karman
-use diffusion_solver, only: vdiff_selector
 use eddy_diff, only: ncvmax
 use time_manager, only: is_first_step
 use physics_buffer, only: physics_buffer_desc
@@ -27,10 +26,9 @@ logical :: unicon_is_on
 integer, parameter :: nturb = 5
 
 ! Logical switches for moist mixing ratio diffusion
-type(vdiff_selector) :: fieldlist_wet
-! Logical switches for molecular diffusion
-! (Molecular diffusion is not done here.)
-type(vdiff_selector) :: fieldlist_molec
+! (molecular diffusion is not done here)
+logical :: do_diffusion_const_wet(1)
+logical :: do_molecular_diffusion_const(1)
 
 integer :: ntop_eddy, nbot_eddy
 
@@ -152,7 +150,6 @@ subroutine eddy_diff_init(pbuf2d, ntop_eddy_in, nbot_eddy_in)
   use cam_history, only: addfld, add_default, horiz_only
   use constituents, only: cnst_get_ind
   use ref_pres, only: pref_mid
-  use diffusion_solver, only: new_fieldlist_vdiff, vdiff_select
   use eddy_diff, only: init_eddy_diff
   use physics_buffer, only: pbuf_set_field, pbuf_get_index
 
@@ -200,18 +197,10 @@ subroutine eddy_diff_init(pbuf2d, ntop_eddy_in, nbot_eddy_in)
   end do
   ml2(nbot_eddy+1:pver+1) = 0._r8
 
-  ! Get fieldlists to pass to diffusion solver.
-  fieldlist_wet   = new_fieldlist_vdiff(1)
-  fieldlist_molec = new_fieldlist_vdiff(1)
-
-  call handle_errmsg(vdiff_select(fieldlist_wet,'s'), &
-       subname="vdiff_select")
-  call handle_errmsg(vdiff_select(fieldlist_wet,'q',1), &
-       subname="vdiff_select")
-  call handle_errmsg(vdiff_select(fieldlist_wet,'u'), &
-       subname="vdiff_select")
-  call handle_errmsg(vdiff_select(fieldlist_wet,'v'), &
-       subname="vdiff_select")
+  ! Only diffuse constituent 1 and disable molecular diffusion
+  do_diffusion_const_wet(:) = .false.
+  do_molecular_diffusion_const(:) = .false.
+  do_diffusion_const_wet(1) = .true.
 
   ! Cloud mass constituents
   call cnst_get_ind('CLDLIQ', ixcldliq)
@@ -801,52 +790,54 @@ subroutine compute_eddy_diff( pbuf, lchnk  ,                                    
         ! Diffuse initial profile of each time step using a given (kvh_out,kvm_out)
         ! In the below 'compute_vdiff', (slfd,qtfd,ufd,vfd) are 'inout' variables.
         call compute_vdiff( &
-                   ncol            = ncol,                                          &
-                   pver            = pver,                                          &
-                   pverp           = pverp,                                         &
-                   ncnst           = 1,                                             &
-                   ztodt           = ztodt,                                         &
-                   fieldlist       = fieldlist_wet,                                 &
-                   fieldlistm      = fieldlist_molec,                               &
-                   itaures         = .false.,                                       &
-                   t               = t(:ncol,:pver),                                &
-                   tint            = tint(:ncol,:pverp),                            &
-                   p               = p,                                             &
-                   rhoi            = rhoi(:ncol,:pverp),                            &
-                   taux            = taux(:ncol),                                   &
-                   tauy            = tauy(:ncol),                                   &
-                   shflx           = shflx(:ncol),                                  &
-                   cflx            = qflx(:ncol,:1),                                & ! ncnst = 1
-                   dse_top         = zero,                                          &
-                   kvh             = kvh_out(:ncol,:pverp),                         &
-                   kvm             = kvm_out(:ncol,:pverp),                         &
-                   kvq             = kvh_out(:ncol,:pverp),                         & ! [sic] kvh_out is assigned to kvh, kvq
-                   cgs             = cgs(:ncol,:pverp),                             &
-                   cgh             = cgh(:ncol,:pverp),                             &
-                   ksrftms         = ksrftms(:ncol),                                &
-                   dragblj         = dragblj(:ncol,:pver),                          &
-                   qmincg          = zero,                                          &
-                   ! input/output
-                   u               = ufd(:ncol,:pver),                              &
-                   v               = vfd(:ncol,:pver),                              &
-                   q               = qtfd(:ncol,:pver,:1),                          & ! ncnst = 1
-                   dse             = slfd(:ncol,:pver),                             &
-                   tauresx         = tauresx(:ncol),                                &
-                   tauresy         = tauresy(:ncol),                                &
-                   ! below output
-                   dtk             = jnk2d(:ncol,:pver),                            &
-                   tautmsx         = jnk1d(:ncol),                                  &
-                   tautmsy         = jnk1d(:ncol),                                  &
-                   topflx          = jnk1d(:ncol),                                  &
-                   errmsg          = errstring,                                     &
-                   ! arguments for Beljaars
-                   do_beljaars     = do_beljaars,                                   &
-                   ! arguments for molecular diffusion only.
-                   do_molec_diff   = .false.,                                       &
-                   use_temperature_molec_diff = .false.,                            &
-                   cpairv          = cpairv(:ncol,:,lchnk),                         &
-                   rairv           = rairv(:ncol,:,lchnk),                          &
-                   mbarv           = mbarv(:ncol,:,lchnk))
+             ncol            = ncol,                                          &
+             pver            = pver,                                          &
+             pverp           = pverp,                                         &
+             ncnst           = 1,                                             &
+             ztodt           = ztodt,                                         &
+             do_diffusion_u_v= .true.,                                        & ! horizontal winds and
+             do_diffusion_s  = .true.,                                        & ! dry static energy are diffused
+             do_diffusion_const = do_diffusion_const_wet,                     & ! together with moist constituent
+             do_molecular_diffusion_const = do_molecular_diffusion_const,     &
+             itaures         = .false.,                                       &
+             t               = t(:ncol,:pver),                                &
+             tint            = tint(:ncol,:pverp),                            &
+             p               = p,                                             &
+             rhoi            = rhoi(:ncol,:pverp),                            &
+             taux            = taux(:ncol),                                   &
+             tauy            = tauy(:ncol),                                   &
+             shflx           = shflx(:ncol),                                  &
+             cflx            = qflx(:ncol,:1),                                & ! ncnst = 1
+             dse_top         = zero,                                          &
+             kvh             = kvh_out(:ncol,:pverp),                         &
+             kvm             = kvm_out(:ncol,:pverp),                         &
+             kvq             = kvh_out(:ncol,:pverp),                         & ! [sic] kvh_out is assigned to kvh, kvq
+             cgs             = cgs(:ncol,:pverp),                             &
+             cgh             = cgh(:ncol,:pverp),                             &
+             ksrftms         = ksrftms(:ncol),                                &
+             dragblj         = dragblj(:ncol,:pver),                          &
+             qmincg          = zero,                                          &
+             ! input/output
+             u               = ufd(:ncol,:pver),                              &
+             v               = vfd(:ncol,:pver),                              &
+             q               = qtfd(:ncol,:pver,:1),                          & ! ncnst = 1
+             dse             = slfd(:ncol,:pver),                             &
+             tauresx         = tauresx(:ncol),                                &
+             tauresy         = tauresy(:ncol),                                &
+             ! below output
+             dtk             = jnk2d(:ncol,:pver),                            &
+             tautmsx         = jnk1d(:ncol),                                  &
+             tautmsy         = jnk1d(:ncol),                                  &
+             topflx          = jnk1d(:ncol),                                  &
+             errmsg          = errstring,                                     &
+             ! arguments for Beljaars
+             do_beljaars     = do_beljaars,                                   &
+             ! arguments for molecular diffusion only.
+             do_molec_diff   = .false.,                                       &
+             use_temperature_molec_diff = .false.,                            &
+             cpairv          = cpairv(:ncol,:,lchnk),                         &
+             rairv           = rairv(:ncol,:,lchnk),                          &
+             mbarv           = mbarv(:ncol,:,lchnk))
 
         call handle_errmsg(errstring, subname="compute_vdiff", &
              extra_msg="compute_vdiff called from eddy_diff_cam")

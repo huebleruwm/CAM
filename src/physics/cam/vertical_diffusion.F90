@@ -53,7 +53,6 @@ module vertical_diffusion
 use shr_kind_mod,     only : r8 => shr_kind_r8
 use ppgrid,           only : pcols, pver, pverp
 use constituents,     only : pcnst
-use diffusion_solver, only : vdiff_selector
 use cam_abortutils,   only : endrun
 use error_messages,   only : handle_errmsg
 use physconst,        only :          &
@@ -100,9 +99,12 @@ logical              :: do_pseudocon_diff = .false.  ! If .true., do pseudo-cons
 
 character(len=16)    :: shallow_scheme               ! Shallow convection scheme
 
-type(vdiff_selector) :: fieldlist_wet                ! Logical switches for moist mixing ratio diffusion
-type(vdiff_selector) :: fieldlist_dry                ! Logical switches for dry mixing ratio diffusion
-type(vdiff_selector) :: fieldlist_molec              ! Logical switches for molecular diffusion
+logical              :: do_diffusion_const_dry(pcnst)! Do vertical diffusion (as dry) for this constituent?
+logical              :: do_diffusion_const_wet(pcnst)! Do vertical diffusion (as wet) for this constituent?
+logical              :: do_molecular_diffusion_const(pcnst) ! Do molecular diffusion for this constituent?
+                                                            ! In compute_vdiff, both do_diffusion_const and molecular_diffusion_const
+                                                            ! have to be true for molec diff to happen
+
 integer              :: tke_idx, kvh_idx, kvm_idx    ! TKE and eddy diffusivity indices for fields in the physics buffer
 integer              :: kvt_idx                      ! Index for kinematic molecular conductivity
 integer              :: tauresx_idx, tauresy_idx     ! Redisual stress for implicit surface stress
@@ -265,7 +267,7 @@ subroutine vertical_diffusion_init(pbuf2d)
   use eddy_diff_cam,     only : eddy_diff_init
   use holtslag_boville_diff, only : holtslag_boville_diff_init
   use molec_diff,        only : init_molec_diff
-  use diffusion_solver,  only : init_vdiff, new_fieldlist_vdiff, vdiff_select
+  use diffusion_solver,  only : init_vdiff
   use constituents,      only : cnst_get_ind, cnst_get_type_byind, cnst_name, cnst_get_molec_byind, cnst_ndropmixed
   use spmd_utils,        only : masterproc
   use ref_pres,          only : press_lim_idx, pref_mid
@@ -358,7 +360,6 @@ subroutine vertical_diffusion_init(pbuf2d)
   call cnst_get_ind( 'Q', ixq ) ! water vapor index in const array.
 
   ! Initialize upper boundary condition module
-
   call ubc_init()
 
   ! ---------------------------------------------------------------------------------------- !
@@ -464,33 +465,27 @@ subroutine vertical_diffusion_init(pbuf2d)
   call init_vdiff(r8, iulog, rair, cpair, gravit, do_iss, fv_am_correction, errstring)
   call handle_errmsg(errstring, subname="init_vdiff")
 
-  ! Use fieldlist_wet to select the fields which will be diffused using moist mixing ratios ( all by default )
-  ! Use fieldlist_dry to select the fields which will be diffused using dry   mixing ratios.
+  ! Set which fields will be diffused using dry or moist mixing ratios.
+  ! All fields are diffused using moist mixing ratios by default.
+  do_diffusion_const_dry(:) = .false.
+  do_diffusion_const_wet(:) = .false.
+  do_molecular_diffusion_const(:) = .false.
 
-  fieldlist_wet = new_fieldlist_vdiff( pcnst)
-  fieldlist_dry = new_fieldlist_vdiff( pcnst)
-  fieldlist_molec = new_fieldlist_vdiff( pcnst)
+  const_loop: do k = 1, pcnst
+    ! If constituent is treated in dropmixnuc (vertically mixed by ndrop activation process)
+    ! then do not handle vertical diffusion in this module.
+    if (cnst_ndropmixed(k)) then
+      cycle const_loop
+    endif
 
-  if( vdiff_select( fieldlist_wet, 'u' ) .ne. '' ) call endrun( vdiff_select( fieldlist_wet, 'u' ) )
-  if( vdiff_select( fieldlist_wet, 'v' ) .ne. '' ) call endrun( vdiff_select( fieldlist_wet, 'v' ) )
-  if( vdiff_select( fieldlist_wet, 's' ) .ne. '' ) call endrun( vdiff_select( fieldlist_wet, 's' ) )
+    ! Convert all constituents to wet before doing diffusion.
+    do_diffusion_const_wet(k) = .true.
 
-  constit_loop: do k = 1, pcnst
-
-     ! Do not diffuse tracer -- treated in dropmixnuc
-     if (cnst_ndropmixed(k))  cycle constit_loop
-
-     ! Convert all constituents to wet before doing diffusion.
-     if( vdiff_select( fieldlist_wet, 'q', k ) .ne. '' ) call endrun( vdiff_select( fieldlist_wet, 'q', k ) )
-
-     ! ----------------------------------------------- !
-     ! Select constituents for molecular diffusion     !
-     ! ----------------------------------------------- !
-     if ( cnst_get_molec_byind(k) .eq. 'minor' ) then
-        if( vdiff_select(fieldlist_molec,'q',k) .ne. '' ) call endrun( vdiff_select( fieldlist_molec,'q',k ) )
-     endif
-
-  end do constit_loop
+    ! Select constituents for molecular diffusion
+    if (cnst_get_molec_byind(k) .eq. 'minor') then
+       do_molecular_diffusion_const(k) = .true.
+    endif
+  end do const_loop
 
   ! ------------------------ !
   ! Diagnostic output fields !
@@ -709,7 +704,7 @@ subroutine vertical_diffusion_tend( &
   use wv_saturation,        only : qsat
   use molec_diff,           only : compute_molec_diff, vd_lu_qdecomp
   use constituents,         only : qmincg, qmin, cnst_type
-  use diffusion_solver,     only : compute_vdiff, any, operator(.not.)
+  use diffusion_solver,     only : compute_vdiff
   use air_composition,      only : cpairv, rairv !Needed for calculation of upward H flux
   use air_composition,      only : mbarv
   use time_manager,         only : get_nstep
@@ -1354,7 +1349,7 @@ subroutine vertical_diffusion_tend( &
      cflux = cam_in%cflx
   end select
 
-  if( any(fieldlist_wet) ) then
+  if( any(do_diffusion_const_wet) ) then
 
      if (do_molec_diff) then
         call compute_molec_diff(state%lchnk, pcols, pver, pcnst, ncol, &
@@ -1368,8 +1363,10 @@ subroutine vertical_diffusion_tend( &
           pverp           = pverp,                                         &
           ncnst           = pcnst,                                         &
           ztodt           = ztodt,                                         &
-          fieldlist       = fieldlist_wet,                                 &
-          fieldlistm      = fieldlist_molec,                               &
+          do_diffusion_u_v= .true.,                                        & ! horizontal winds and
+          do_diffusion_s  = .true.,                                        & ! dry static energy are diffused
+          do_diffusion_const = do_diffusion_const_wet,                     & ! together with moist constituents.
+          do_molecular_diffusion_const = do_molecular_diffusion_const,     &
           itaures         = .true.,                                        &
           t               = state%t(:ncol,:pver),                          &
           tint            = tint(:ncol,:pverp),                            &
@@ -1426,7 +1423,7 @@ subroutine vertical_diffusion_tend( &
 
   end if
 
-  if( any( fieldlist_dry ) ) then
+  if( any( do_diffusion_const_dry ) ) then
 
      if( do_molec_diff ) then
         ! kvm is unused in the output here (since it was assigned
@@ -1444,8 +1441,10 @@ subroutine vertical_diffusion_tend( &
           pverp           = pverp,                                         &
           ncnst           = pcnst,                                         &
           ztodt           = ztodt,                                         &
-          fieldlist       = fieldlist_dry,                                 &
-          fieldlistm      = fieldlist_molec,                               &
+          do_diffusion_u_v= .false.,                                       &
+          do_diffusion_s  = .false.,                                       &
+          do_diffusion_const = do_diffusion_const_dry,                     &
+          do_molecular_diffusion_const = do_molecular_diffusion_const,     &
           itaures         = .true.,                                        &
           t               = state%t(:ncol,:pver),                          &
           tint            = tint(:ncol,:pverp),                            &

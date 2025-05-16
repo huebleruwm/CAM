@@ -9,10 +9,6 @@
   ! Public interfaces :                                                                 !
   !    init_vdiff       initializes time independent coefficients                       !
   !    compute_vdiff    solves diffusion equations                                      !
-  !    vdiff_selector   type for storing fields selected to be diffused                 !
-  !    vdiff_select     selects fields to be diffused                                   !
-  !    operator(.not.)  extends .not. to operate on type vdiff_selector                 !
-  !    any              provides functionality of intrinsic any for type vdiff_selector !
   !                                                                                     !
   !------------------------------------ Code History ---------------------------------- !
   ! Initial subroutines :  B. Boville and others, 1991-2004                             !
@@ -30,32 +26,8 @@
   ! Public interfaces !
   ! ----------------- !
 
-  public init_vdiff                                      ! Initialization
-  public new_fieldlist_vdiff                             ! Returns an empty fieldlist
-  public compute_vdiff                                   ! Full routine
-  public vdiff_selector                                  ! Type for storing fields selected to be diffused
-  public vdiff_select                                    ! Selects fields to be diffused
-  public operator(.not.)                                 ! Extends .not. to operate on type vdiff_selector
-  public any                                             ! Provides functionality of intrinsic any for type vdiff_selector
-
-  ! Below stores logical array of fields to be diffused
-
-  type vdiff_selector
-       private
-       logical, allocatable, dimension(:) :: fields
-  end type vdiff_selector
-
-  ! Below extends .not. to operate on type vdiff_selector
-
-  interface operator(.not.)
-       module procedure not
-  end interface
-
-  ! Below provides functionality of intrinsic any for type vdiff_selector
-
-  interface any
-       module procedure my_any
-  end interface
+  public :: init_vdiff                                      ! Initialization
+  public :: compute_vdiff                                   ! Full routine
 
   ! ------------ !
   ! Private data !
@@ -113,29 +85,15 @@
 
   end subroutine init_vdiff
 
-  ! =============================================================================== !
-  !                                                                                 !
-  ! =============================================================================== !
-
-  type(vdiff_selector) pure function new_fieldlist_vdiff(ncnst)
-
-    integer,              intent(in)  :: ncnst           ! Number of constituents
-
-    allocate( new_fieldlist_vdiff%fields( 3 + ncnst ) )
-    new_fieldlist_vdiff%fields = .false.
-
-  end function new_fieldlist_vdiff
-
-  ! =============================================================================== !
-  !                                                                                 !
-  ! =============================================================================== !
-
   subroutine compute_vdiff( ncol, pver, pverp, ncnst, tint        , &
                             p               , t                  , rhoi          , ztodt        , taux        , &
                             tauy            , shflx              , cflx          , &
                             kvh             , kvm                , kvq           , cgs          , cgh         , &
-                            ksrftms            , dragblj       , &
-                            qmincg          , fieldlist          , fieldlistm    , &
+                            ksrftms         , dragblj         , &
+                            qmincg          , &
+                            do_diffusion_u_v, do_diffusion_s, &
+                            do_diffusion_const, &
+                            do_molecular_diffusion_const, &
                             u               , v                  , q             , dse          ,               &
                             tautmsx         , tautmsy            , dtk           , topflx       , errmsg   , &
                             tauresx         , tauresy            , itaures       , &
@@ -155,19 +113,19 @@
     ! obtained from the turbulence module.                                      !
     !-------------------------------------------------------------------------- !
 
-!    Used for CAM debugging.
-!    use phys_debug_util,    only : phys_debug_col
-!    use time_manager,       only : is_first_step, get_nstep
+    !    Used for CAM debugging.
+    !    use phys_debug_util,    only : phys_debug_col
+    !    use time_manager,       only : is_first_step, get_nstep
 
     use coords_1d, only: Coords1D
     use linear_1d_operators, only : BoundaryType, BoundaryFixedLayer, &
          BoundaryData, BoundaryFlux, TriDiagDecomp
     use vdiff_lu_solver,     only : fin_vol_lu_decomp
     use vertical_diffusion_solver, only : fin_vol_solve
- 
-  ! Modification : Ideally, we should diffuse 'liquid-ice static energy' (sl), not the dry static energy.
-  !                Also, vertical diffusion of cloud droplet number concentration and aerosol number
-  !                concentration should be done very carefully in the future version.
+
+    ! Modification : Ideally, we should diffuse 'liquid-ice static energy' (sl), not the dry static energy.
+    !                Also, vertical diffusion of cloud droplet number concentration and aerosol number
+    !                concentration should be done very carefully in the future version.
 
     ! Input Arguments
     integer,  intent(in) :: ncol             ! Number of atmospheric columns
@@ -176,8 +134,10 @@
     integer,  intent(in) :: ncnst            ! # of constituents to diffuse. In eddy_diff, only wv. Others, pcnst.
     real(r8), intent(in) :: ztodt            ! 2 delta-t [ s ]
 
-    type(vdiff_selector), intent(in) :: fieldlist        ! Array of flags selecting which fields to diffuse
-    type(vdiff_selector), intent(in) :: fieldlistm       ! Array of flags selecting which fields for molecular diffusion
+    logical,  intent(in) :: do_diffusion_u_v                ! diffuse horizontal winds [flag]
+    logical,  intent(in) :: do_diffusion_s                  ! diffuse dry static energy [flag]
+    logical,  intent(in) :: do_diffusion_const(:)           ! diffuse constituents (size ncnst) [flag]
+    logical,  intent(in) :: do_molecular_diffusion_const(:) ! molecular diffusion of constituents (size ncnst) [flag]
 
     logical,  intent(in) :: itaures          ! Whether 'tauresx,tauresy' is updated in this subroutine.
 
@@ -374,16 +334,29 @@
     ! ----------------------- !
 
     errmsg = ''
-    if( ( diffuse(fieldlist,'u') .or. diffuse(fieldlist,'v') ) .and. .not. diffuse(fieldlist,'s') ) then
-          errmsg = 'diffusion_solver.compute_vdiff: must diffuse s if diffusing u or v'
-          return
+    if( do_diffusion_u_v .and. (.not. do_diffusion_s) ) then
+        errmsg = 'compute_vdiff: must diffuse s if diffusing horizontal winds'
+        return
     end if
+
+    ! Check if logical array is of the expected size
+    if ( size(do_diffusion_const) .ne. ncnst ) then
+        write(errmsg,*) 'compute_vdiff: do_diffusion_const size ', size(do_diffusion_const), ' is not equal to ncnst ', ncnst
+        return
+    endif
+
+    if ( size(do_molecular_diffusion_const) .ne. ncnst ) then
+        write(errmsg,*) 'compute_vdiff: do_molecular_diffusion_const size ', size(do_molecular_diffusion_const), ' is not equal to ncnst ', ncnst
+        return
+    endif
+
+
 
     !--------------------------------------- !
     ! Computation of Molecular Diffusivities !
     !--------------------------------------- !
 
-  ! Modification : Why 'kvq' is not changed by molecular diffusion ?
+    ! Modification : Why 'kvq' is not changed by molecular diffusion ?
 
     if( do_molec_diff ) then
 
@@ -431,7 +404,7 @@
        end do
     end do
 
-    if( diffuse(fieldlist,'u') .or. diffuse(fieldlist,'v') ) then
+    if( do_diffusion_u_v ) then
 
         ! Compute the vertical upward differences of the input u,v for KE dissipation
         ! at each interface.
@@ -692,16 +665,16 @@
 
        end if
 
-    end if ! End of diffuse horizontal momentum, diffuse(fieldlist,'u') routine
+    end if ! End of diffuse horizontal momentum routine
 
     !-------------------------- !
     ! Diffuse Dry Static Energy !
     !-------------------------- !
 
-  ! Modification : In future, we should diffuse the fully conservative
-  !                moist static energy,not the dry static energy.
+    ! Modification : In future, we should diffuse the fully conservative
+    !                moist static energy,not the dry static energy.
 
-    if( diffuse(fieldlist,'s') ) then
+    if( do_diffusion_s ) then
 
        ! Add counter-gradient to input static energy profiles
        do k = 1, pver
@@ -713,7 +686,7 @@
        ! Add the explicit surface fluxes to the lowest layer
        dse(:ncol,pver) = dse(:ncol,pver) + tmp1(:ncol) * shflx(:ncol)
 
-     ! Diffuse dry static energy
+       ! Diffuse dry static energy
 
        !---------------------------------------------------
        ! Solve for temperature using thermal conductivity
@@ -790,8 +763,8 @@
     ! Diffuse Water Vapor Tracers !
     !---------------------------- !
 
-  ! Modification : For aerosols, I need to use separate treatment
-  !                for aerosol mass and aerosol number.
+    ! Modification : For aerosols, I need to use separate treatment
+    !                for aerosol mass and aerosol number.
 
     ! Loop through constituents
 
@@ -799,9 +772,7 @@
          coef_q_diff=kvq(:ncol,:)*dpidz_sq(:ncol,:))
 
     do m = 1, ncnst
-
-       if( diffuse(fieldlist,'q',m) ) then
-
+       if( do_diffusion_const(m) ) then
           ! Add the nonlocal transport terms to constituents in the PBL.
           ! Check for neg q's in each constituent and put the original vertical
           ! profile back if a neg value is found. A neg value implies that the
@@ -821,16 +792,15 @@
              q(:ncol,k,m) = merge( q(:ncol,k,m), qtm(:ncol,k), lqtst(:ncol) )
           end do
 
-           ! Add the explicit surface fluxes to the lowest layer
+          ! Add the explicit surface fluxes to the lowest layer
+          q(:ncol,pver,m) = q(:ncol,pver,m) + tmp1(:ncol) * cflx(:ncol,m)
 
-           q(:ncol,pver,m) = q(:ncol,pver,m) + tmp1(:ncol) * cflx(:ncol,m)
+          if( do_molec_diff ) then
+            ! do molecular diffusion
 
-           ! Diffuse constituents.
-
-           ! This is for solving molecular diffusion of minor species, thus, for WACCM-X, bypass O and O2 (major species)
-           ! Major species diffusion is calculated separately.  -Hanli Liu
-
-           if( do_molec_diff .and. diffuse(fieldlistm,'q',m)) then
+            ! This is for solving molecular diffusion of minor species, thus, for WACCM-X, bypass O and O2 (major species)
+            ! Major species diffusion is calculated separately.  -Hanli Liu
+            if( do_molecular_diffusion_const(m) ) then
               decomp = vd_lu_qdecomp( &
                 ncol = ncol, &
                 pver = pver, &
@@ -853,120 +823,35 @@
 
               ! This to calculate the upper boundary flux of H.    -Hanli Liu
               if ((cnst_fixed_ubflx(m))) then
-
                  ! ubc_flux is a flux of mass density through space, i.e.:
                  ! ubc_flux = rho_i * dz/dt = q_i * rho * dz/dt
                  ! For flux of mmr through pressure level, multiply by g:
                  ! q_i * rho * gravit * dz/dt = q_i * dp/dt
-
                  call decomp%left_div(q(:ncol,:,m), &
                       l_cond=BoundaryFlux( &
                       -gravit*ubc_flux(:ncol,m), ztodt, &
                       p%del(:,1)))
-
               else
                  call decomp%left_div(q(:ncol,:,m), &
                       l_cond=BoundaryData(ubc_mmr(:ncol,m)))
               end if
-
               call decomp%finalize()
-
-           else
-
-              if (present(cnst_fixed_ubc)) then
-                 ! explicitly set mmr in top layer for cases where molecular diffusion is not active
-                 if (cnst_fixed_ubc(m)) then
-                    q(:ncol,1,m) = ubc_mmr(:ncol,m)
-                 endif
-              end if
-
-              call no_molec_decomp%left_div(q(:ncol,:,m))
-
-           end if
-
+            endif
+          else
+            ! not doing molecular diffusion
+            if (present(cnst_fixed_ubc)) then
+               ! explicitly set mmr in top layer for cases where molecular diffusion is not active
+               if (cnst_fixed_ubc(m)) then
+                  q(:ncol,1,m) = ubc_mmr(:ncol,m)
+               endif
+            end if
+            call no_molec_decomp%left_div(q(:ncol,:,m))
+          end if
        end if
     end do
 
     call no_molec_decomp%finalize()
 
   end subroutine compute_vdiff
-
-  ! =============================================================================== !
-  !                                                                                 !
-  ! =============================================================================== !
-
-  character(128) function vdiff_select( fieldlist, name, qindex )
-    ! --------------------------------------------------------------------- !
-    ! This function sets the field with incoming name as one to be diffused !
-    ! --------------------------------------------------------------------- !
-    type(vdiff_selector), intent(inout)        :: fieldlist
-    character(*),         intent(in)           :: name
-    integer,              intent(in), optional :: qindex
-
-    vdiff_select = ''
-    select case (name)
-    case ('u','U')
-       fieldlist%fields(1) = .true.
-    case ('v','V')
-       fieldlist%fields(2) = .true.
-    case ('s','S')
-       fieldlist%fields(3) = .true.
-    case ('q','Q')
-       if( present(qindex) ) then
-           fieldlist%fields(3 + qindex) = .true.
-       else
-           fieldlist%fields(4) = .true.
-       endif
-    case default
-       write(vdiff_select,*) 'Bad argument to vdiff_index: ', name
-    end select
-    return
-
-  end function vdiff_select
-
-  type(vdiff_selector) function not(a)
-    ! ------------------------------------------------------------- !
-    ! This function extends .not. to operate on type vdiff_selector !
-    ! ------------------------------------------------------------- !
-    type(vdiff_selector), intent(in)  :: a
-    allocate(not%fields(size(a%fields)))
-    not%fields = .not. a%fields
-  end function not
-
-  logical function my_any(a)
-    ! -------------------------------------------------- !
-    ! This function extends the intrinsic function 'any' !
-    ! to operate on type vdiff_selector                  !
-    ! -------------------------------------------------- !
-    type(vdiff_selector), intent(in) :: a
-    my_any = any(a%fields)
-  end function my_any
-
-  logical function diffuse(fieldlist,name,qindex)
-    ! ---------------------------------------------------------------------------- !
-    ! This function reports whether the field with incoming name is to be diffused !
-    ! ---------------------------------------------------------------------------- !
-    type(vdiff_selector), intent(in)           :: fieldlist
-    character(*),         intent(in)           :: name
-    integer,              intent(in), optional :: qindex
-
-    select case (name)
-    case ('u','U')
-       diffuse = fieldlist%fields(1)
-    case ('v','V')
-       diffuse = fieldlist%fields(2)
-    case ('s','S')
-       diffuse = fieldlist%fields(3)
-    case ('q','Q')
-       if( present(qindex) ) then
-           diffuse = fieldlist%fields(3 + qindex)
-       else
-           diffuse = fieldlist%fields(4)
-       endif
-    case default
-       diffuse = .false.
-    end select
-    return
-  end function diffuse
 
 end module diffusion_solver
