@@ -113,10 +113,6 @@
     ! obtained from the turbulence module.                                      !
     !-------------------------------------------------------------------------- !
 
-    !    Used for CAM debugging.
-    !    use phys_debug_util,    only : phys_debug_col
-    !    use time_manager,       only : is_first_step, get_nstep
-
     use coords_1d, only: Coords1D
     use linear_1d_operators, only : BoundaryType, BoundaryFixedLayer, &
          BoundaryData, BoundaryFlux, TriDiagDecomp
@@ -160,6 +156,7 @@
     real(r8), intent(in) :: kvq(:,:)         ! Eddy diffusivity for constituents, interfaces
     real(r8), intent(in) :: cgs(:,:)         ! Counter-gradient star [ cg/flux ], interfaces
     real(r8), intent(in) :: cgh(:,:)         ! Counter-gradient term for heat, interfaces
+    real(r8), intent(in) :: rairv(:,:)       ! Composition dependent gas "constant"
 
     ! Input-Output Arguments
     real(r8), intent(inout) :: u(:,:)        ! U wind. This input is the 'raw' input wind to
@@ -191,7 +188,6 @@
     logical,  intent(in)    :: use_temperature_molec_diff! Flag indicating that molecular diffusion should apply to temperature, not
                                                          ! dry static energy.
     real(r8), intent(in)    :: cpairv(:,:)      ! Specific heat at constant pressure
-    real(r8), intent(in)    :: rairv(:,:)       ! Composition dependent gas "constant"
     real(r8), intent(in)    :: mbarv(:,:)       ! Composition dependent atmosphere mean mass
 
     ! The molecular diffusion module will likely change significantly in

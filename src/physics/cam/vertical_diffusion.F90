@@ -1471,10 +1471,10 @@ subroutine vertical_diffusion_tend( &
           tauresx         = tauresx(:ncol),                                &
           tauresy         = tauresy(:ncol),                                &
           ! below output
-          dtk             = dtk_temp(:ncol,:),                             &
-          tautmsx         = tautmsx_temp(:ncol),                           &
-          tautmsy         = tautmsy_temp(:ncol),                           &
-          topflx          = topflx_temp(:ncol),                            &
+          dtk             = dtk_temp(:ncol,:),                             & ! unused dummy
+          tautmsx         = tautmsx_temp(:ncol),                           & ! unused dummy
+          tautmsy         = tautmsy_temp(:ncol),                           & ! unused dummy
+          topflx          = topflx_temp(:ncol),                            & ! unused dummy
           errmsg          = errstring,                                     &
           ! arguments for Beljaars
           do_beljaars     = do_beljaars,                                   &
