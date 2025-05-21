@@ -767,84 +767,83 @@
     no_molec_decomp = fin_vol_lu_decomp(ztodt, p, &
          coef_q_diff=kvq(:ncol,:)*dpidz_sq(:ncol,:))
 
-    do m = 1, ncnst
-       if( do_diffusion_const(m) ) then
-          ! Add the nonlocal transport terms to constituents in the PBL.
-          ! Check for neg q's in each constituent and put the original vertical
-          ! profile back if a neg value is found. A neg value implies that the
-          ! quasi-equilibrium conditions assumed for the countergradient term are
-          ! strongly violated.
+    const_diffuse_loop: do m = 1, ncnst
+       if( .not. do_diffusion_const(m) ) then
+         cycle const_diffuse_loop
+       endif
 
-          qtm(:ncol,:pver) = q(:ncol,:pver,m)
+       ! Add the nonlocal transport terms to constituents in the PBL.
+       ! Check for neg q's in each constituent and put the original vertical
+       ! profile back if a neg value is found. A neg value implies that the
+       ! quasi-equilibrium conditions assumed for the countergradient term are
+       ! strongly violated.
+       qtm(:ncol,:pver) = q(:ncol,:pver,m)
 
-          do k = 1, pver
-             q(:ncol,k,m) = q(:ncol,k,m) + &
-                            ztodt * p%rdel(:,k) * gravit  * ( cflx(:ncol,m) * rrho(:ncol) ) * &
-                            ( rhoi(:ncol,k+1) * kvh(:ncol,k+1) * cgs(:ncol,k+1)               &
-                            - rhoi(:ncol,k  ) * kvh(:ncol,k  ) * cgs(:ncol,k  ) )
-          end do
-          lqtst(:ncol) = all(q(:ncol,1:pver,m) >= qmincg(m), 2)
-          do k = 1, pver
-             q(:ncol,k,m) = merge( q(:ncol,k,m), qtm(:ncol,k), lqtst(:ncol) )
-          end do
+       do k = 1, pver
+          q(:ncol,k,m) = q(:ncol,k,m) + &
+                         ztodt * p%rdel(:,k) * gravit  * ( cflx(:ncol,m) * rrho(:ncol) ) * &
+                         ( rhoi(:ncol,k+1) * kvh(:ncol,k+1) * cgs(:ncol,k+1)               &
+                         - rhoi(:ncol,k  ) * kvh(:ncol,k  ) * cgs(:ncol,k  ) )
+       end do
+       lqtst(:ncol) = all(q(:ncol,1:pver,m) >= qmincg(m), 2)
+       do k = 1, pver
+          q(:ncol,k,m) = merge( q(:ncol,k,m), qtm(:ncol,k), lqtst(:ncol) )
+       end do
 
-          ! Add the explicit surface fluxes to the lowest layer
-          q(:ncol,pver,m) = q(:ncol,pver,m) + tmp1(:ncol) * cflx(:ncol,m)
+       ! Add the explicit surface fluxes to the lowest layer
+       q(:ncol,pver,m) = q(:ncol,pver,m) + tmp1(:ncol) * cflx(:ncol,m)
 
-          if( do_molec_diff ) then
-            ! do molecular diffusion
+       if( do_molec_diff .and. do_molecular_diffusion_const(m) ) then
+         ! do molecular diffusion
 
-            ! This is for solving molecular diffusion of minor species, thus, for WACCM-X, bypass O and O2 (major species)
-            ! Major species diffusion is calculated separately.  -Hanli Liu
-            if( do_molecular_diffusion_const(m) ) then
-              decomp = vd_lu_qdecomp( &
-                ncol = ncol, &
-                pver = pver, &
-                m = m, & ! constituent index
-                fixed_ubc = cnst_fixed_ubc(m), &
-                mw = cnst_mw(m), &
-                kv = kvq(:ncol,:), & ! eddy diffusivity at interfaces
-                kq_scal = kq_scal(:ncol,:), & ! molecular diffusivity at interfaces
-                mw_facm = mw_fac(:ncol,:,m), & ! composition dependent sqrt(1/M_q + 1/M_d), at interfaces, this constituent
-                dpidz_sq = dpidz_sq(:ncol,:), & ! square of vertical derivative of pint
-                p = p_molec, &
-                interface_boundary = interface_boundary, &
-                molec_boundary = molec_boundary, &
-                t = t(:ncol,:), & ! temperature, midpoints
-                tint = tint(:ncol,:), & ! temperature, interfaces
-                mbarv = mbarv(:ncol,:), & ! composition dependent atmosphere mean mass
-                ztodt = ztodt, &
-                nbot_molec = nbot_molec, &
-                no_molec_decomp = no_molec_decomp)
+         ! This is for solving molecular diffusion of minor species, thus, for WACCM-X, bypass O and O2 (major species)
+         ! Major species diffusion is calculated separately.  -Hanli Liu
+         decomp = vd_lu_qdecomp( &
+           ncol = ncol, &
+           pver = pver, &
+           m = m, & ! constituent index
+           fixed_ubc = cnst_fixed_ubc(m), &
+           mw = cnst_mw(m), &
+           kv = kvq(:ncol,:), & ! eddy diffusivity at interfaces
+           kq_scal = kq_scal(:ncol,:), & ! molecular diffusivity at interfaces
+           mw_facm = mw_fac(:ncol,:,m), & ! composition dependent sqrt(1/M_q + 1/M_d), at interfaces, this constituent
+           dpidz_sq = dpidz_sq(:ncol,:), & ! square of vertical derivative of pint
+           p = p_molec, &
+           interface_boundary = interface_boundary, &
+           molec_boundary = molec_boundary, &
+           t = t(:ncol,:), & ! temperature, midpoints
+           tint = tint(:ncol,:), & ! temperature, interfaces
+           mbarv = mbarv(:ncol,:), & ! composition dependent atmosphere mean mass
+           ztodt = ztodt, &
+           nbot_molec = nbot_molec, &
+           no_molec_decomp = no_molec_decomp)
 
-              ! This to calculate the upper boundary flux of H.    -Hanli Liu
-              if ((cnst_fixed_ubflx(m))) then
-                 ! ubc_flux is a flux of mass density through space, i.e.:
-                 ! ubc_flux = rho_i * dz/dt = q_i * rho * dz/dt
-                 ! For flux of mmr through pressure level, multiply by g:
-                 ! q_i * rho * gravit * dz/dt = q_i * dp/dt
-                 call decomp%left_div(q(:ncol,:,m), &
-                      l_cond=BoundaryFlux( &
-                      -gravit*ubc_flux(:ncol,m), ztodt, &
-                      p%del(:,1)))
-              else
-                 call decomp%left_div(q(:ncol,:,m), &
-                      l_cond=BoundaryData(ubc_mmr(:ncol,m)))
-              end if
-              call decomp%finalize()
+         ! This to calculate the upper boundary flux of H.    -Hanli Liu
+         if ((cnst_fixed_ubflx(m))) then
+            ! ubc_flux is a flux of mass density through space, i.e.:
+            ! ubc_flux = rho_i * dz/dt = q_i * rho * dz/dt
+            ! For flux of mmr through pressure level, multiply by g:
+            ! q_i * rho * gravit * dz/dt = q_i * dp/dt
+            call decomp%left_div(q(:ncol,:,m), &
+                 l_cond=BoundaryFlux( &
+                 -gravit*ubc_flux(:ncol,m), ztodt, &
+                 p%del(:,1)))
+         else
+            call decomp%left_div(q(:ncol,:,m), &
+                 l_cond=BoundaryData(ubc_mmr(:ncol,m)))
+         end if
+         call decomp%finalize()
+       else
+         ! not doing molecular diffusion
+         if (present(cnst_fixed_ubc)) then
+            ! explicitly set mmr in top layer for cases where molecular diffusion is not active
+            if (cnst_fixed_ubc(m)) then
+               q(:ncol,1,m) = ubc_mmr(:ncol,m)
             endif
-          else
-            ! not doing molecular diffusion
-            if (present(cnst_fixed_ubc)) then
-               ! explicitly set mmr in top layer for cases where molecular diffusion is not active
-               if (cnst_fixed_ubc(m)) then
-                  q(:ncol,1,m) = ubc_mmr(:ncol,m)
-               endif
-            end if
-            call no_molec_decomp%left_div(q(:ncol,:,m))
-          end if
+         end if
+         call no_molec_decomp%left_div(q(:ncol,:,m))
        end if
-    end do
+    end do const_diffuse_loop
 
     call no_molec_decomp%finalize()
 
