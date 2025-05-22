@@ -413,7 +413,7 @@ subroutine compute_eddy_diff( pbuf, lchnk  ,                                    
   !                       May.    2008.                                 !
   !-------------------------------------------------------------------- !
 
-  use diffusion_solver,     only: compute_vdiff
+  use diffusion_solver_cam, only: compute_vdiff
   use cam_history,          only: outfld
   use phys_debug_util,      only: phys_debug_col
   use air_composition,      only: cpairv, rairv, mbarv

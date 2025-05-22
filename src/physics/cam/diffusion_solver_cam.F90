@@ -1,5 +1,5 @@
 
-  module diffusion_solver
+  module diffusion_solver_cam
 
   !------------------------------------------------------------------------------------ !
   ! Module to solve vertical diffusion equations using a tri-diagonal solver.           !
@@ -41,14 +41,6 @@
   real(r8), private   :: rair                            ! Gas constant for dry air
 
   logical,  private   :: do_iss                          ! Use implicit turbulent surface stress computation
-
-  ! Parameters used for Turbulent Mountain Stress
-
-  real(r8), parameter :: z0fac   = 0.025_r8              ! Factor determining z_0 from orographic standard deviation
-  real(r8), parameter :: z0max   = 100._r8               ! Max value of z_0 for orography
-  real(r8), parameter :: horomin = 10._r8                ! Min value of subgrid orographic height for mountain stress
-  real(r8), parameter :: dv2min  = 0.01_r8               ! Minimum shear squared
-
   logical :: am_correction ! logical switch for AM correction
 
   contains
@@ -345,8 +337,6 @@
         write(errmsg,*) 'compute_vdiff: do_molecular_diffusion_const size ', size(do_molecular_diffusion_const), ' is not equal to ncnst ', ncnst
         return
     endif
-
-
 
     !--------------------------------------- !
     ! Computation of Molecular Diffusivities !
@@ -849,4 +839,4 @@
 
   end subroutine compute_vdiff
 
-end module diffusion_solver
+end module diffusion_solver_cam
