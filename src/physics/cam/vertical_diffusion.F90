@@ -937,7 +937,14 @@ subroutine vertical_diffusion_tend( &
   ! set temperature at TOA interface, otherwise use temperature at TOA
   if (waccmx_mode) then
      ! For WACCM-X, set ubc temperature to extrapolate from next two lower interface level temperatures
-     t_toai(:ncol) = 1.5_r8*state%t(:ncol,2)-.5_r8*state%t(:ncol,3)
+     ! the original formulation is:
+     ! t_toai(:ncol) = 1.5_r8*tint(:ncol,2)-.5_r8*tint(:ncol,3)
+     ! this appears to be:
+     !               = tint(:ncol,2) + 0.5_r8*(tint(:ncol,2) - tint(:ncol,3))
+     ! assuming that the extrapolated gradient is 1/2 of the temperature gradient between the lower interfaces
+     ! because the interpolation will be done later in the CCPP-ized scheme, formulate this in terms of
+     ! the temperature (at midpoints):
+     t_toai(:ncol) = 1.5_r8*(state%t(:ncol,2)+state%t(:ncol,1))/2._r8-.5_r8*(state%t(:ncol,3)+state%t(:ncol,2))/2._r8
   else
     if(ubc_fixed_temp) then
       ! Fixed temperature at upper boundary condition
