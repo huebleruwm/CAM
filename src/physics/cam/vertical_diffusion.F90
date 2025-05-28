@@ -711,7 +711,13 @@ subroutine vertical_diffusion_tend( &
   ! to replace compute_vdiff
   ! and interstitials that have been CCPP-ized
   use diffusion_solver,     only: vertical_diffusion_interpolate_to_interfaces_run
-  use diffusion_solver,     only: vertical_diffusion_compute_run
+  use diffusion_solver,     only: implicit_surface_stress_add_drag_coefficient_run
+  use diffusion_stubs,      only: turbulent_mountain_stress_add_drag_coefficient_run
+  use diffusion_solver,     only: vertical_diffusion_wind_damping_rate_run
+  use diffusion_stubs,      only: beljaars_add_wind_damping_rate_run
+  use diffusion_solver,     only: vertical_diffusion_diffuse_horizontal_momentum_run
+  use diffusion_solver,     only: vertical_diffusion_diffuse_dry_static_energy_run
+  use diffusion_solver,     only: vertical_diffusion_diffuse_tracers_run
   use diffusion_solver,     only: vertical_diffusion_tendencies_run
   use ccpp_constituent_prop_mod, only: ccpp_const_props
 
@@ -905,6 +911,14 @@ subroutine vertical_diffusion_tend( &
   real(r8) :: thv(pcols,pver) ! virtual potential temperature [K]
   real(r8) :: wstar(pcols)    ! convective scale velocity [m s-1]
   real(r8) :: bge(pcols)      ! buoyancy gradient enhancement
+
+  ! Temporaries for CCPP-ized diffusion solver
+  real(r8) :: ksrf(pcols) ! total surface drag coefficient
+  real(r8) :: tau_damp_rate(pcols, pver) ! wind damping rate
+  real(r8) :: tautotx_ccpp(pcols)
+  real(r8) :: tautoty_ccpp(pcols)
+  real(r8) :: dpidz_sq(pcols, pverp) ! square of derivative of pressure with height
+
   character(len=512)   :: errmsg
   integer              :: errflg
 
@@ -960,6 +974,7 @@ subroutine vertical_diffusion_tend( &
   rairi(:,:) = 0._r8
   rhoi(:,:) = 0._r8
   rhoi_dry(:,:) = 0._r8
+  dpidz_sq(:,:) = 0._r8
   !REMOVECAM_END
 
   ! Interpolate t, rho (moist and dry), and set rairi
@@ -970,6 +985,7 @@ subroutine vertical_diffusion_tend( &
        ncol     = ncol, &
        pver     = pver, &
        pverp    = pverp, &
+       gravit   = gravit, &
        rair     = rair, &
        rairv    = rairv(:ncol,:pver,state%lchnk), &
        ! only use constituent-dependent gas constant when in WACCM-X mode.
@@ -983,6 +999,7 @@ subroutine vertical_diffusion_tend( &
        rairi    = rairi(:ncol,:pverp), &
        rhoi     = rhoi(:ncol,:pverp), &
        rhoi_dry = rhoi_dry(:ncol,:pverp), &
+       dpidz_sq = dpidz_sq(:ncol,:pverp), &
        errmsg   = errmsg, &
        errflg   = errflg)
 
@@ -1382,39 +1399,80 @@ subroutine vertical_diffusion_tend( &
     ! Dry static energy top boundary is zero if no molecular diffusion
     dse_top(:ncol) = 0._r8
 
+    ksrf(:) = 0._r8
+    tau_damp_rate(:,:) = 0._r8
+    tautotx_ccpp(:) = 0._r8
+    tautoty_ccpp(:) = 0._r8
+
+    ! Calculate surface drag rate
+    call implicit_surface_stress_add_drag_coefficient_run( &
+         ncol            = ncol,                         &
+         pver            = pver,                         &
+         taux            = taux(:ncol),                  &
+         tauy            = tauy(:ncol),                  &
+         u0              = state%u(:ncol,:pver),         &
+         v0              = state%v(:ncol,:pver),         &
+         ! below input/output:
+         ksrf            = ksrf(:ncol),                  &
+         errmsg          = errmsg,                       &
+         errflg          = errflg)
+
+    ! Add TMS surface drag rate
+    call turbulent_mountain_stress_add_drag_coefficient_run( &
+         ncol            = ncol,                         &
+         pver            = pver,                         &
+         ksrftms         = ksrftms(:ncol),               &
+         ! below input/output:
+         ksrf            = ksrf(:ncol),                  &
+         errmsg          = errmsg,                       &
+         errflg          = errflg)
+
+    ! Based on the drag coefficients, calculate wind damping rates
+    call vertical_diffusion_wind_damping_rate_run( &
+         ncol            = ncol,                         &
+         pver            = pver,                         &
+         gravit          = gravit,                       &
+         p               = p,                            & ! Coords1D, pressure coordinates [Pa]
+         ksrf            = ksrf(:ncol),                  &
+         ! below output:
+         tau_damp_rate   = tau_damp_rate(:ncol,:pver),   &
+         errmsg          = errmsg,                       &
+         errflg          = errflg)
+
+    ! Add Beljaars wind damping rate
+    call beljaars_add_wind_damping_rate_run( &
+         ncol            = ncol,                         &
+         pver            = pver,                         &
+         dragblj         = dragblj(:ncol,:pver),         &
+         ! below input/output:
+         tau_damp_rate   = tau_damp_rate(:ncol,:pver),   &
+         errmsg          = errmsg,                       &
+         errflg          = errflg)
+
     ! If molecular diffusion is not done, use the CCPP-ized subroutine
-    call vertical_diffusion_compute_run( &
+    call vertical_diffusion_diffuse_horizontal_momentum_run( &
          ncol            = ncol,                         &
          pver            = pver,                         &
          pverp           = pverp,                        &
-         ncnst           = pcnst,                        &
          ztodt           = ztodt,                        &
          rair            = rair,                         &
          gravit          = gravit,                       &
-         do_diffusion_u_v= .true.,                       & ! horizontal winds and
-         do_diffusion_s  = .true.,                       & ! dry static energy are diffused
-         do_diffusion_const = do_diffusion_const_wet,    & ! together with moist constituents.
+         do_diffusion_uvs= .true.,                       & ! horizontal winds and dry static energy are diffused
          itaures         = .true.,                       &
          t               = state%t(:ncol,:pver),         &
          p               = p,                            & ! Coords1D, pressure coordinates [Pa]
          rhoi            = rhoi(:ncol,:pverp),           &
          taux            = taux(:ncol),                  &
          tauy            = tauy(:ncol),                  &
-         shflx           = shflux(:ncol),                &
-         cflx            = cflux(:ncol,:pcnst),          &
-         dse_top         = dse_top(:ncol),               & ! zero
-         kvh             = kvh(:ncol,:pverp),            &
+         tau_damp_rate   = tau_damp_rate(:ncol,:pver),   & ! tau damp rate from above
          kvm             = kvm(:ncol,:pverp),            &
-         kvq             = kvq(:ncol,:pverp),            &
          cgs             = cgs(:ncol,:pverp),            &
          cgh             = cgh(:ncol,:pverp),            &
          ksrftms         = ksrftms(:ncol),               &
          dragblj         = dragblj(:ncol,:pver),         &
-         qmincg          = qmincg(:pcnst),               &
-         rairv           = rairv(:ncol,:,state%lchnk),   &
+         dpidz_sq        = dpidz_sq(:ncol,:pverp),       & ! moist
          u0              = state%u(:ncol,:pver),         &
          v0              = state%v(:ncol,:pver),         &
-         q0              = state%q(:ncol,:pver,:pcnst),  &
          dse0            = state%s(:ncol,:pver),         &
          ! input/output
          tauresx         = tauresx(:ncol),               &
@@ -1422,17 +1480,57 @@ subroutine vertical_diffusion_tend( &
          ! below output
          u               = u_tmp(:ncol,:pver),           &
          v               = v_tmp(:ncol,:pver),           &
-         q               = q_tmp(:ncol,:pver,:pcnst),    &
          dse             = s_tmp(:ncol,:pver),           &
          dtk             = dtk(:ncol,:),                 &
          tautmsx         = tautmsx(:ncol),               &
          tautmsy         = tautmsy(:ncol),               &
          ! arguments for Beljaars
          do_beljaars     = do_beljaars,                  &
+         errmsg          = errmsg,                       &
+         errflg          = errflg)
+
+    ! Diffuse dry static energy
+    call vertical_diffusion_diffuse_dry_static_energy_run( &
+         ncol            = ncol,                         &
+         pver            = pver,                         &
+         ztodt           = ztodt,                        &
+         gravit          = gravit,                       &
+         p               = p,                            & ! Coords1D, pressure coordinates [Pa]
+         rhoi            = rhoi(:ncol,:pverp),           &
+         shflx           = shflux(:ncol),                &
+         dse_top         = dse_top(:ncol),               & ! zero
+         kvh             = kvh(:ncol,:pverp),            &
+         cgh             = cgh(:ncol,:pverp),            &
+         dpidz_sq        = dpidz_sq(:ncol,:pverp),       & ! moist
+         ! input/output
+         dse             = s_tmp(:ncol,:pver),           &
+         errmsg          = errmsg,                       &
+         errflg          = errflg)
+
+    ! Diffuse tracers
+    call vertical_diffusion_diffuse_tracers_run( &
+         ncol            = ncol,                         &
+         pver            = pver,                         &
+         ncnst           = pcnst,                        &
+         ztodt           = ztodt,                        &
+         rair            = rair,                         &
+         gravit          = gravit,                       &
+         do_diffusion_const = do_diffusion_const_wet,    & ! moist constituents to diffuse
+         p               = p,                            & ! Coords1D, pressure coordinates [Pa]
+         t               = state%t(:ncol,:pver),         &
+         rhoi            = rhoi(:ncol,:pverp),           &
+         cflx            = cflux(:ncol,:pcnst),          &
+         kvh             = kvh(:ncol,:pverp),            &
+         kvq             = kvq(:ncol,:pverp),            &
+         cgs             = cgs(:ncol,:pverp),            &
+         qmincg          = qmincg(:pcnst),               &
+         dpidz_sq        = dpidz_sq(:ncol,:pverp),       & ! moist
          ! FIXME: I think ubc can be removed here
          ! check from regression tests -- hplin 5/21/25
          ubc_mmr         = ubc_mmr(:ncol,:pcnst),        &
          cnst_fixed_ubc  = cnst_fixed_ubc(:pcnst),       &
+         q0              = state%q(:ncol,:pver,:pcnst),  &
+         q               = q_tmp(:ncol,:pver,:pcnst),    &
          errmsg          = errmsg,                       &
          errflg          = errflg)
   else
