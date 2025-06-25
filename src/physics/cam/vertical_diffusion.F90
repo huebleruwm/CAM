@@ -268,7 +268,6 @@ subroutine vertical_diffusion_init(pbuf2d)
   use eddy_diff_cam,     only : eddy_diff_init
 
   use holtslag_boville_diff, only: holtslag_boville_diff_init
-  use diffusion_solver,  only: vertical_diffusion_compute_init
   use vertical_diffusion_sponge_layer, only: vertical_diffusion_sponge_layer_init
 
   use holtslag_boville_diff_interstitials, only: hb_diff_set_vertical_diffusion_top_init
@@ -436,13 +435,6 @@ subroutine vertical_diffusion_init(pbuf2d)
 
   call init_vdiff(r8, iulog, rair, cpair, gravit, do_iss, fv_am_correction, errstring)
   call handle_errmsg(errstring, subname="init_vdiff")
-
-  ! Initialize CCPP-ized diffusion solver module
-  call vertical_diffusion_compute_init(&
-      do_iss_in = do_iss, &
-      am_correction_in = fv_am_correction, &
-      errmsg = errmsg, &
-      errflg = errflg)
 
   ! Set which fields will be diffused using dry or moist mixing ratios.
   ! All fields are diffused using moist mixing ratios by default.
@@ -657,6 +649,8 @@ subroutine vertical_diffusion_tend( &
   !---------------------------------------------------- !
   use physics_buffer,     only : physics_buffer_desc, pbuf_get_field, pbuf_set_field
   use physics_types,      only : physics_state, physics_ptend, physics_ptend_init
+
+  use phys_control,       only: fv_am_correction
 
   use camsrfexch,           only : cam_in_t
   use cam_history,          only : outfld
@@ -1025,7 +1019,7 @@ subroutine vertical_diffusion_tend( &
   ! as well as Coords1D (p) pressure coordinates used by the solver.
 
   !REMOVECAM: no longer needed when pcols no longer exists
-  q_wv_cflx(:) = 0._kind_phys
+  q_wv_cflx(:) = 0._r8
   !END REMOVECAM
 
   if(eddy_scheme .eq. 'CLUBB_SGS') then
@@ -1496,9 +1490,9 @@ subroutine vertical_diffusion_tend( &
          tauresx         = tauresx(:ncol),               &
          tauresy         = tauresy(:ncol),               &
          ! below output
-         u               = u_tmp(:ncol,:pver),           &
-         v               = v_tmp(:ncol,:pver),           &
-         dse             = s_tmp(:ncol,:pver),           &
+         u1              = u_tmp(:ncol,:pver),           &
+         v1              = v_tmp(:ncol,:pver),           &
+         dse1            = s_tmp(:ncol,:pver),           &
          dtk             = dtk(:ncol,:),                 &
          tautmsx         = tautmsx(:ncol),               &
          tautmsy         = tautmsy(:ncol),               &
@@ -1834,10 +1828,10 @@ subroutine vertical_diffusion_tend( &
      v0          = state%v(:ncol,:pver), &
      s0          = state%s(:ncol,:pver), &
      q0          = state%q(:ncol,:pver,:pcnst), &
-     u           = u_tmp(:ncol,:pver), &
-     v           = v_tmp(:ncol,:pver), &
-     s           = s_tmp(:ncol,:pver), &
-     q           = q_tmp(:ncol,:pver,:pcnst), &
+     u1          = u_tmp(:ncol,:pver), &
+     v1          = v_tmp(:ncol,:pver), &
+     s1          = s_tmp(:ncol,:pver), &
+     q1          = q_tmp(:ncol,:pver,:pcnst), &
      ! below output
      tend_s      = ptend%s(:ncol,:pver), &
      tend_u      = ptend%u(:ncol,:pver), &
