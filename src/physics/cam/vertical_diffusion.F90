@@ -142,8 +142,6 @@ logical              :: is_clubb_scheme = .false.
 logical              :: waccmx_mode = .false.
 logical              :: do_hb_above_clubb = .false.
 
-real(r8),allocatable :: kvm_sponge(:)
-
 contains
 
   ! =============================================================================== !
@@ -271,12 +269,16 @@ subroutine vertical_diffusion_init(pbuf2d)
 
   use holtslag_boville_diff, only: holtslag_boville_diff_init
   use diffusion_solver,  only: vertical_diffusion_compute_init
+  use vertical_diffusion_sponge_layer, only: vertical_diffusion_sponge_layer_init
+
+  use holtslag_boville_diff_interstitials, only: hb_diff_set_vertical_diffusion_top_init
+  use holtslag_boville_diff_interstitials, only: hb_diff_set_vertical_diffusion_top_waccmx_init
 
   use molec_diff,        only : init_molec_diff
   use diffusion_solver_cam, only : init_vdiff
   use constituents,      only : cnst_get_ind, cnst_get_type_byind, cnst_name, cnst_get_molec_byind, cnst_ndropmixed
   use spmd_utils,        only : masterproc
-  use ref_pres,          only : press_lim_idx, pref_mid
+  use ref_pres,          only : pref_mid
   use physics_buffer,    only : pbuf_set_field, pbuf_get_index, physics_buffer_desc
   use trb_mtn_stress_cam,only : trb_mtn_stress_init
   use beljaars_drag_cam, only : beljaars_drag_init
@@ -289,8 +291,6 @@ subroutine vertical_diffusion_init(pbuf2d)
   integer        :: ntop_eddy   ! Top    interface level to which eddy vertical diffusion is applied ( = 1 )
   integer        :: nbot_eddy   ! Bottom interface level to which eddy vertical diffusion is applied ( = pver )
   integer        :: k           ! Vertical loop index
-
-  real(r8), parameter :: ntop_eddy_pres = 1.e-7_r8 ! Pressure below which eddy diffusion is not done in WACCM-X. (Pa)
 
   integer :: ierr
 
@@ -306,46 +306,12 @@ subroutine vertical_diffusion_init(pbuf2d)
   !
   ! add sponge layer vertical diffusion
   !
-  if (ptop_ref>1e-1_r8.and.ptop_ref<100.0_r8) then
-     !
-     ! CAM7 FMT (but not CAM6 top (~225 Pa) or CAM7 low top or lower)
-     !
-     allocate(kvm_sponge(4), stat=ierr)
-     if( ierr /= 0 ) then
-        write(iulog,*) 'vertical_diffusion_init:  kvm_sponge allocation error = ',ierr
-        call endrun('vertical_diffusion_init: failed to allocate kvm_sponge array')
-     end if
-     kvm_sponge(1) = 2E6_r8
-     kvm_sponge(2) = 2E6_r8
-     kvm_sponge(3) = 0.5E6_r8
-     kvm_sponge(4) = 0.1E6_r8
-  else if (ptop_ref>1e-4_r8) then
-     !
-     ! WACCM and WACCM-x
-     !
-     allocate(kvm_sponge(6), stat=ierr)
-     if( ierr /= 0 ) then
-        write(iulog,*) 'vertical_diffusion_init:  kvm_sponge allocation error = ',ierr
-        call endrun('vertical_diffusion_init: failed to allocate kvm_sponge array')
-     end if
-     kvm_sponge(1) = 2E6_r8
-     kvm_sponge(2) = 2E6_r8
-     kvm_sponge(3) = 1.5E6_r8
-     kvm_sponge(4) = 1.0E6_r8
-     kvm_sponge(5) = 0.5E6_r8
-     kvm_sponge(6) = 0.1E6_r8
-  end if
-
-  if (masterproc) then
-     write(iulog,*)'Initializing vertical diffusion (vertical_diffusion_init)'
-     if (allocated(kvm_sponge)) then
-        write(iulog,*)'Artificial sponge layer vertical diffusion added:'
-        do k=1,size(kvm_sponge(:),1)
-           write(iulog,'(a44,i2,a17,e7.2,a8)') 'vertical diffusion coefficient at interface',k,' is increased by ', &
-                                                kvm_sponge(k),' m2 s-2'
-        end do
-     end if !allocated
-  end if
+  call vertical_diffusion_sponge_layer_init( &
+    amIRoot  = masterproc, &
+    iulog    = iulog, &
+    ptop_ref = ptop_ref, &
+    errmsg   = errmsg, &
+    errflg   = errflg)
 
   ! Check to see if WACCM-X is on (currently we don't care whether the
   ! ionosphere is on or not, since this neutral diffusion code is the
@@ -396,9 +362,9 @@ subroutine vertical_diffusion_init(pbuf2d)
   ! ntop_eddy must be 1 or <= nbot_molec
   ! Currently, it is always 1 except for WACCM-X.
   if ( waccmx_mode ) then
-     ntop_eddy  = press_lim_idx(ntop_eddy_pres, top=.true.)
+     call hb_diff_set_vertical_diffusion_top_waccmx_init(ntop_eddy=ntop_eddy, errmsg=errmsg, errflg=errflg)
   else
-     ntop_eddy = 1
+     call hb_diff_set_vertical_diffusion_top_init(ntop_eddy=ntop_eddy, errmsg=errmsg, errflg=errflg)
   end if
   nbot_eddy  = pver
 
@@ -707,9 +673,14 @@ subroutine vertical_diffusion_tend( &
   ! CCPP-ized HB (free atmosphere) scheme
   use holtslag_boville_diff, only: hb_diff_free_atm_exchange_coefficients_run
 
+  ! CCPP-ized sponge layer logic
+  use vertical_diffusion_sponge_layer, only: vertical_diffusion_sponge_layer_run
+
   ! CCPP-ized vertical diffusion solver (for non-WACCM-X use)
   ! to replace compute_vdiff
   ! and interstitials that have been CCPP-ized
+  use holtslag_boville_diff_interstitials, only: hb_diff_prepare_vertical_diffusion_inputs_run
+  use holtslag_boville_diff_interstitials, only: hb_free_atm_diff_prepare_vertical_diffusion_inputs_run
   use diffusion_solver,     only: vertical_diffusion_interpolate_to_interfaces_run
   use diffusion_solver,     only: implicit_surface_stress_add_drag_coefficient_run
   use diffusion_stubs,      only: turbulent_mountain_stress_add_drag_coefficient_run
@@ -721,7 +692,9 @@ subroutine vertical_diffusion_tend( &
   use diffusion_solver,     only: vertical_diffusion_tendencies_run
   use ccpp_constituent_prop_mod, only: ccpp_const_props
 
+
   use wv_saturation,        only : qsat
+  use diffusion_solver,     only: vertical_diffusion_set_dry_static_energy_at_toa_molecdiff_run
   use molec_diff,           only : compute_molec_diff, vd_lu_qdecomp
   use constituents,         only : qmincg, qmin, cnst_type
   use diffusion_solver_cam, only : compute_vdiff
@@ -911,6 +884,7 @@ subroutine vertical_diffusion_tend( &
   real(r8) :: thv(pcols,pver) ! virtual potential temperature [K]
   real(r8) :: wstar(pcols)    ! convective scale velocity [m s-1]
   real(r8) :: bge(pcols)      ! buoyancy gradient enhancement
+  real(r8) :: q_wv_cflx(pcols)! water vapor surface upward flux for kinematic wv fluxes
 
   ! Temporaries for CCPP-ized diffusion solver
   real(r8) :: ksrf(pcols) ! total surface drag coefficient
@@ -918,6 +892,8 @@ subroutine vertical_diffusion_tend( &
   real(r8) :: tautotx_ccpp(pcols)
   real(r8) :: tautoty_ccpp(pcols)
   real(r8) :: dpidz_sq(pcols, pverp) ! square of derivative of pressure with height
+  logical  :: itaures
+  character(len=64) :: scheme_name
 
   character(len=512)   :: errmsg
   integer              :: errflg
@@ -935,10 +911,6 @@ subroutine vertical_diffusion_tend( &
   call pbuf_get_field(pbuf, tpert_idx,    tpert)
   call pbuf_get_field(pbuf, qpert_idx,    qpert)
   call pbuf_get_field(pbuf, pblh_idx,     pblh)
-
-  ! Set up pressure coordinates for solver calls.
-  p = Coords1D(state%pint(:ncol,:))
-  p_dry = Coords1D(state%pintdry(:ncol,:))
 
   ! Get upper boundary values
   call ubc_get_vals( state%lchnk, ncol, state%pint, state%zi, ubc_t, ubc_mmr )
@@ -1004,6 +976,9 @@ subroutine vertical_diffusion_tend( &
        errflg   = errflg)
 
   ! Initialize total surface stresses
+  ! these are used for HB diffusion scheme and later PBL diagnostics but
+  ! not for the vertical diffusion solver, which uses surface stresses from the coupler
+  ! or just zero (in the case of CLUBB)
   tautotx(:ncol) = cam_in%wsx(:ncol)
   tautoty(:ncol) = cam_in%wsy(:ncol)
 
@@ -1021,10 +996,11 @@ subroutine vertical_diffusion_tend( &
   call pbuf_get_field(pbuf, tautmsx_idx, tautmsx)
   call pbuf_get_field(pbuf, tautmsy_idx, tautmsy)
 
-  ! TODO: check if changing this to accummulate to tautotx, tautoty would change b4b-ness hplin 5/21/25
   ! Add turbulent mountain stress to total surface stress
-  tautotx(:ncol) = cam_in%wsx(:ncol) + tautmsx(:ncol)
-  tautoty(:ncol) = cam_in%wsy(:ncol) + tautmsy(:ncol)
+  ! tautotx(:ncol) = cam_in%wsx(:ncol) + tautmsx(:ncol)
+  ! tautoty(:ncol) = cam_in%wsy(:ncol) + tautmsy(:ncol)
+  tautotx(:ncol) = tautotx(:ncol) + tautmsx(:ncol)
+  tautoty(:ncol) = tautoty(:ncol) + tautmsy(:ncol)
 
   ! ------------------------------------- !
   ! Computation of Beljaars SGO form drag !
@@ -1040,6 +1016,64 @@ subroutine vertical_diffusion_tend( &
   tautotx(:ncol) = tautotx(:ncol) + taubljx(:ncol)
   tautoty(:ncol) = tautoty(:ncol) + taubljy(:ncol)
 
+  ! -------------------------------------
+  ! Preparation of HB/HB_free inputs to vertical diffusion
+  ! -------------------------------------
+
+  ! Use CCPPized interstitial schemes for setting
+  ! the necessary inputs (taux,tauy,shflux,cflux) for vertical_diffusion_compute_run from the coupler
+  ! as well as Coords1D (p) pressure coordinates used by the solver.
+
+  !REMOVECAM: no longer needed when pcols no longer exists
+  q_wv_cflx(:) = 0._kind_phys
+  !END REMOVECAM
+
+  if(eddy_scheme .eq. 'CLUBB_SGS') then
+     ! If running CLUBB_SGS, use the hb_free_atm CCPPized interstitial.
+     !
+     ! In this case, vertical diffusion solver only applies constituent fluxes excluding water vapor
+     ! (before CAM7); no fluxes are applied in CAM7.
+     call hb_free_atm_diff_prepare_vertical_diffusion_inputs_run( &
+          ncol              = ncol,                       &
+          pverp             = pverp,                      &
+          pcnst             = pcnst,                      &
+          const_props       = ccpp_const_props,           &
+          flag_for_cflux    = cam_physpkg_is("cam7"),     & ! does vertical diffusion apply ANY fluxes?
+          cflx_from_coupler = cam_in%cflx(:ncol,:pcnst),  &
+          pint              = state%pint(:ncol,:pverp),   &
+          ! below output
+          taux              = taux(:ncol),                & ! these are zero since handled by CLUBB.
+          tauy              = tauy(:ncol),                & ! these are zero since handled by CLUBB.
+          shflux            = shflux(:ncol),              & ! these are zero since handled by CLUBB.
+          cflux             = cflux(:ncol,:pcnst),        & ! if flag_for_cflux, contains non-wv. fluxes, otherwise 0
+          itaures           = itaures,                    &
+          p                 = p,                          &
+          q_wv_cflx         = q_wv_cflx(:ncol),           & ! for use in HB for kinematic water vapor flux calc.
+          errmsg            = errmsg,                     &
+          errflg            = errflg)
+  else
+     call hb_diff_prepare_vertical_diffusion_inputs_run( &
+          ncol               = ncol,                      &
+          pverp              = pverp,                     &
+          pcnst              = pcnst,                     &
+          const_props        = ccpp_const_props,          &
+          wsx_from_coupler   = cam_in%wsx(:ncol),         &
+          wsy_from_coupler   = cam_in%wsy(:ncol),         &
+          shf_from_coupler   = cam_in%shf(:ncol),         &
+          cflx_from_coupler  = cam_in%cflx(:ncol,:pcnst), &
+          pint               = state%pint(:ncol,:pverp),  &
+          ! below output
+          taux               = taux(:ncol),               &
+          tauy               = tauy(:ncol),               &
+          shflux             = shflux(:ncol),             &
+          cflux              = cflux(:ncol,:pcnst),       &
+          itaures            = itaures,                   &
+          p                  = p,                         &
+          q_wv_cflx          = q_wv_cflx(:ncol),          & ! for use in HB for kinematic water vapor flux calc.
+          errmsg             = errmsg,                 &
+          errflg             = errflg)
+  endif
+
   !----------------------------------------------------------------------- !
   !   Computation of eddy diffusivities - Select appropriate PBL scheme    !
   !----------------------------------------------------------------------- !
@@ -1052,6 +1086,9 @@ subroutine vertical_diffusion_tend( &
 
      ! Get potential temperature.
      th(:ncol,:pver) = state%t(:ncol,:pver) * state%exner(:ncol,:pver)
+
+     ! Set up pressure coordinates for solver calls.
+     p = Coords1D(state%pint(:ncol,:))
 
      call eddy_diff_tend(state, pbuf, cam_in, &
           ztodt, p, tint, rhoi, cldn, wstarent, &
@@ -1102,7 +1139,7 @@ subroutine vertical_diffusion_tend( &
        taux      = tautotx(:ncol),           &
        tauy      = tautoty(:ncol),           &
        shflx     = cam_in%shf(:ncol),        &
-       q_wv_flx  = cam_in%cflx(:ncol,ixq),   &
+       q_wv_flx  = q_wv_cflx(:ncol),         &
        ! Output variables
        thv       = thv(:ncol,:pver),         &
        ustar     = ustar(:ncol),             &
@@ -1220,7 +1257,7 @@ subroutine vertical_diffusion_tend( &
         taux      = tautotx(:ncol),           &
         tauy      = tautoty(:ncol),           &
         shflx     = cam_in%shf(:ncol),        &
-        q_wv_flx  = cam_in%cflx(:ncol,1),     & ! NOTE: assumes wv at 1 (need to change to ixq?)
+        q_wv_flx  = q_wv_cflx(:ncol),         &
         ! Output variables
         thv       = thv(:ncol,:pver),         &
         ustar     = ustar(:ncol),             &
@@ -1305,11 +1342,12 @@ subroutine vertical_diffusion_tend( &
   !
   ! add sponge layer vertical diffusion
   !
-  if (allocated(kvm_sponge)) then
-     do k=1,size(kvm_sponge(:),1)
-        kvm(:ncol,1) = kvm(:ncol,1)+kvm_sponge(k)
-     end do
-  end if
+  call vertical_diffusion_sponge_layer_run( &
+    ncol   = ncol,   &
+    pverp  = pverp,  &
+    kvm    = kvm,    & ! in/out
+    errmsg = errmsg, &
+    errflg = errflg)
 
   ! kvh (in pbuf) is used by other physics parameterizations, and as an initial guess in compute_eddy_diff
   ! on the next timestep.  It is not updated by the compute_vdiff call below.
@@ -1373,28 +1411,6 @@ subroutine vertical_diffusion_tend( &
   !                the explicit 'tautotx, tautoty' computed above.
   ! Note that the output 'tauresx,tauresy' from below subroutines are fully implicit ones.
 
-  ! This will be converted to an interstitial in SIMA for setting
-  ! the necessary inputs for vertical_diffusion_compute_run
-  if(eddy_scheme .eq. 'CLUBB_SGS') then
-     ! CLUBB applies some fluxes itself, but we still want constituent
-     ! fluxes applied here (except water vapor).
-     taux = 0._r8
-     tauy = 0._r8
-     shflux = 0._r8
-     cflux(:,1) = 0._r8
-     if (cam_physpkg_is("cam7")) then
-       ! surface fluxes applied in clubb emissions module
-       cflux(:,2:) = 0._r8
-     else
-       cflux(:,2:) = cam_in%cflx(:,2:)
-     end if
-  else
-     taux = cam_in%wsx
-     tauy = cam_in%wsy
-     shflux = cam_in%shf
-     cflux = cam_in%cflx
-  endif
-
   if(.not. do_molec_diff) then
     ! Dry static energy top boundary is zero if no molecular diffusion
     dse_top(:ncol) = 0._r8
@@ -1408,6 +1424,7 @@ subroutine vertical_diffusion_tend( &
     call implicit_surface_stress_add_drag_coefficient_run( &
          ncol            = ncol,                         &
          pver            = pver,                         &
+         do_iss          = do_iss,                       &
          taux            = taux(:ncol),                  &
          tauy            = tauy(:ncol),                  &
          u0              = state%u(:ncol,:pver),         &
@@ -1457,8 +1474,9 @@ subroutine vertical_diffusion_tend( &
          ztodt           = ztodt,                        &
          rair            = rair,                         &
          gravit          = gravit,                       &
-         do_diffusion_uvs= .true.,                       & ! horizontal winds and dry static energy are diffused
-         itaures         = .true.,                       &
+         do_iss          = do_iss,                       &
+         am_correction   = fv_am_correction,             &
+         itaures         = itaures,                      &
          t               = state%t(:ncol,:pver),         &
          p               = p,                            & ! Coords1D, pressure coordinates [Pa]
          rhoi            = rhoi(:ncol,:pverp),           &
@@ -1525,8 +1543,7 @@ subroutine vertical_diffusion_tend( &
          cgs             = cgs(:ncol,:pverp),            &
          qmincg          = qmincg(:pcnst),               &
          dpidz_sq        = dpidz_sq(:ncol,:pverp),       & ! moist
-         ! FIXME: I think ubc can be removed here
-         ! check from regression tests -- hplin 5/21/25
+         ! upper boundary conditions from ubc module
          ubc_mmr         = ubc_mmr(:ncol,:pcnst),        &
          cnst_fixed_ubc  = cnst_fixed_ubc(:pcnst),       &
          q0              = state%q(:ncol,:pver,:pcnst),  &
@@ -1539,8 +1556,19 @@ subroutine vertical_diffusion_tend( &
      ! Top boundary condition for dry static energy if molecular diffusion is active
      ! but not in WACCM-X mode
      if (.not. waccmx_mode) then
-        dse_top(:ncol) = cpairv(:ncol,1,lchnk) * tint(:ncol,1) + &
-             gravit * state%zi(:ncol,1)
+        !REMOVECAM: no longer need this after pcols no longer exists
+        dse_top(:) = 0._r8
+        !END REMOVECAM
+
+        call vertical_diffusion_set_dry_static_energy_at_toa_molecdiff_run( &
+             ncol = ncol, &
+             gravit = gravit, &
+             cpairv = cpairv(:ncol,:,state%lchnk), &
+             zi = state%zi(:ncol,:), &
+             tint = tint(:ncol,:), &
+             dse_top = dse_top(:ncol), &
+             errmsg = errmsg, &
+             errflg = errflg)
      else
         dse_top(:ncol) = 0._r8
      end if
@@ -1560,7 +1588,7 @@ subroutine vertical_diffusion_tend( &
              do_diffusion_s  = .true.,                                        & ! dry static energy are diffused
              do_diffusion_const = do_diffusion_const_wet,                     & ! together with moist constituents.
              do_molecular_diffusion_const = do_molecular_diffusion_const,     &
-             itaures         = .true.,                                        &
+             itaures         = itaures,                                       &
              t               = state%t(:ncol,:pver),                          &
              tint            = tint(:ncol,:pverp),                            &
              p               = p,                                             & ! Coords1D, pressure coordinates [Pa]
@@ -1624,6 +1652,9 @@ subroutine vertical_diffusion_tend( &
              kvm_temp, kvt, tint, rhoi_dry, kq_scal, cnst_mw, &
              mw_fac, nbot_molec)
 
+        ! Set up dry pressure coordinates for solver call.
+        p_dry = Coords1D(state%pintdry(:ncol,:))
+
         call compute_vdiff( &
              ncol            = ncol,                                          &
              pver            = pver,                                          &
@@ -1634,7 +1665,7 @@ subroutine vertical_diffusion_tend( &
              do_diffusion_s  = .false.,                                       &
              do_diffusion_const = do_diffusion_const_dry,                     &
              do_molecular_diffusion_const = do_molecular_diffusion_const,     &
-             itaures         = .true.,                                        &
+             itaures         = itaures,                                       &
              t               = state%t(:ncol,:pver),                          &
              tint            = tint(:ncol,:pverp),                            &
              p               = p_dry,                                         & ! Coords1D, pressure coordinates [Pa]
@@ -1812,6 +1843,7 @@ subroutine vertical_diffusion_tend( &
      tend_u      = ptend%u(:ncol,:pver), &
      tend_v      = ptend%v(:ncol,:pver), &
      tend_q      = ptend%q(:ncol,:pver,:pcnst), &
+     scheme_name = scheme_name, &
      errmsg      = errmsg, &
      errflg      = errflg)
 
