@@ -1478,8 +1478,6 @@ subroutine vertical_diffusion_tend( &
          tauy            = tauy(:ncol),                  &
          tau_damp_rate   = tau_damp_rate(:ncol,:pver),   & ! tau damp rate from above
          kvm             = kvm(:ncol,:pverp),            &
-         cgs             = cgs(:ncol,:pverp),            &
-         cgh             = cgh(:ncol,:pverp),            &
          ksrftms         = ksrftms(:ncol),               &
          dragblj         = dragblj(:ncol,:pver),         &
          dpidz_sq        = dpidz_sq(:ncol,:pverp),       & ! moist
