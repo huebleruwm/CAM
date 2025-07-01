@@ -24,7 +24,6 @@ use rad_constituents,    only: N_DIAG, rad_cnst_get_call_list, rad_cnst_out
 
 use radconstants,        only: nradgas, gasnamelength, nswbands, nlwbands, &
                                gaslist, radconstants_init
-use rad_solar_var,       only: rad_solar_var_init, get_variability
 
 use cloud_rad_props,     only: cloud_rad_props_init
 
@@ -415,6 +414,8 @@ subroutine radiation_init(pbuf2d)
    use rrtmgp_inputs,          only: rrtmgp_inputs_init
    use rrtmgp_inputs_cam,      only: rrtmgp_inputs_cam_init
    use rrtmgp_lw_cloud_optics, only: rrtmgp_lw_cloud_optics_init
+   use rrtmgp_sw_solar_var,    only: rrtmgp_sw_solar_var_init
+   use solar_irrad_data,       only: do_spctrl_scaling, has_spectrum
 
    ! Initialize the radiation and cloud optics.
    ! Add fields to the history buffer.
@@ -483,7 +484,10 @@ subroutine radiation_init(pbuf2d)
    ! Set radconstants module-level index variables that we're setting in CCPP-ized scheme now
    call radconstants_init(idx_sw_diag, idx_nir_diag, idx_uv_diag, idx_lw_diag)
 
-   call rad_solar_var_init(nswbands)
+   call rrtmgp_sw_solar_var_init(nswbands, do_spctrl_scaling, has_spectrum, errmsg, errflg)
+   if (errflg /= 0) then
+      call endrun(sub//': '//errmsg)
+   end if
 
    ! initialize output fields for offline driver
    call rad_data_init(pbuf2d)
@@ -821,6 +825,9 @@ subroutine radiation_tend( &
    use rrtmgp_lw_main,                    only: rrtmgp_lw_main_run
    use rrtmgp_dry_static_energy_tendency, only: rrtmgp_dry_static_energy_tendency_run
    use rrtmgp_post,                       only: rrtmgp_post_run
+   use rrtmgp_sw_solar_var,               only: rrtmgp_sw_solar_var_run
+   use rrtmgp_sw_mcica_subcol_gen,        only: rrtmgp_sw_mcica_subcol_gen_run
+   use rrtmgp_sw_cloud_optics,            only: rrtmgp_sw_cloud_optics_run
 
    use rrtmgp_inputs_cam,                 only: rrtmgp_get_gas_mmrs, rrtmgp_set_aer_lw, &
                                                 rrtmgp_set_gases_sw, rrtmgp_set_cloud_sw, &
@@ -833,10 +840,12 @@ subroutine radiation_tend( &
    use radheat,                           only: radheat_tend
 
    use radiation_data,                    only: rad_data_write
+   use solar_irrad_data,                  only: sol_irrad, we, nbins, sol_tsi, do_spctrl_scaling
 
    use interpolate_data,                  only: vertinterp
    use tropopause,                        only: tropopause_find_cam, TROP_ALG_HYBSTOB, TROP_ALG_CLIMATE
    use cospsimulator_intr,                only: docosp, cospsimulator_intr_run, cosp_nradsteps
+   use cam_history_support,               only: fillvalue
 
 
    ! Arguments
@@ -881,6 +890,12 @@ subroutine radiation_tend( &
    real(r8)          :: cld_lw_abs(nlwbands,state%ncol,pver)  ! Cloud absorption optics depth
    real(r8)          :: snow_lw_abs(nlwbands,state%ncol,pver) ! Snow absorption optics depth
    real(r8)          :: grau_lw_abs(nlwbands,state%ncol,pver) ! Graupel absorption optics depth
+   real(r8)          :: cld_tau(nswbands,state%ncol,pver)  ! Cloud absorption optics depth (sw)
+   real(r8)          :: snow_tau(nlwbands,state%ncol,pver) ! Snow absorption optics depth (sw)
+   real(r8)          :: grau_tau(nlwbands,state%ncol,pver) ! Graupel absorption optics depth (sw)
+   real(r8)          :: c_cld_tau(nlwbands,state%ncol,pver)
+   real(r8)          :: c_cld_tau_w(nlwbands,state%ncol,pver)
+   real(r8)          :: c_cld_tau_w_g(nlwbands,state%ncol,pver)
    real(r8), pointer :: qrs(:,:) ! shortwave radiative heating rate adjusted by air pressure thickness
    real(r8), pointer :: qrl(:,:) ! longwave  radiative heating rate adjusted by air pressure thickness
    real(r8)          :: qrs_prime(pcols, pver) ! shortwave heating rate
@@ -1127,6 +1142,33 @@ subroutine radiation_tend( &
       else
          cldfsnow_in => null()
       end if
+      ! Grab additional pbuf fields for LW cloud optics
+      dei_idx = pbuf_get_index('DEI',errcode=err)
+      mu_idx  = pbuf_get_index('MU',errcode=err)
+      lambda_idx = pbuf_get_index('LAMBDAC',errcode=err)
+      iciwp_idx  = pbuf_get_index('ICIWP',errcode=err)
+      iclwp_idx  = pbuf_get_index('ICLWP',errcode=err)
+      des_idx    = pbuf_get_index('DES',errcode=err)
+      icswp_idx  = pbuf_get_index('ICSWP',errcode=err)
+      icgrauwp_idx  = pbuf_get_index('ICGRAUWP',errcode=err) ! Available when using MG3
+      degrau_idx    = pbuf_get_index('DEGRAU',errcode=err)   ! Available when using MG3
+      call pbuf_get_field(pbuf, lambda_idx,  lambda)
+      call pbuf_get_field(pbuf, mu_idx,      mu)
+      call pbuf_get_field(pbuf, iclwp_idx,   iclwp)
+      call pbuf_get_field(pbuf, iciwp_idx, iciwp)
+      call pbuf_get_field(pbuf, dei_idx,   dei)
+      call pbuf_get_field(pbuf, icswp_idx, icswp)
+      call pbuf_get_field(pbuf, des_idx,   des)
+      if (icgrauwp_idx > 0) then
+         call pbuf_get_field(pbuf, icgrauwp_idx, icgrauwp)
+      end if
+      if (degrau_idx > 0) then
+         call pbuf_get_field(pbuf, degrau_idx,   degrau)
+      end if
+
+      do_graupel = ((icgrauwp_idx > 0) .and. (degrau_idx > 0) .and. associated(cldfgrau)) .and. graupel_in_rad
+      do_snow = associated(cldfsnow)
+
       ! Prepare state variables, daylit columns, albedos for RRTMGP
       ! Also calculate modified cloud fraction
       call rrtmgp_inputs_run(dosw, dolw, associated(cldfsnow), associated(cldfgrau), &
@@ -1155,13 +1197,26 @@ subroutine radiation_tend( &
       if (dosw) then
 
          ! Set cloud optical properties in cloud_sw object.
-         call rrtmgp_set_cloud_sw( &
-            state, pbuf, nlay, nday, idxday, nswgpts,            &
-            nnite, idxnite, pmid_day, cld, cldfsnow,                      &
-            cldfgrau, cldfprime, graupel_in_rad, kdist_sw, cloud_sw,      &
-            rd%tot_cld_vistau, rd%tot_icld_vistau, rd%liq_icld_vistau,    &
-            rd%ice_icld_vistau, rd%snow_icld_vistau, rd%grau_icld_vistau, &
-            cld_tau_cloudsim, snow_tau_cloudsim, grau_tau_cloudsim )
+         call rrtmgp_sw_cloud_optics_run(dosw, ncol, pver, ktopcam, ktoprad, nlay, nswgpts, nday, idxday, &
+             fillvalue, nswbands, iulog, mu(:ncol,:), lambda(:ncol,:), nnite, idxnite, cld, cldfsnow(:ncol,:), &
+             cldfgrau(:ncol,:), cldfprime(:,:,:), cld_tau(:,:,:), grau_tau(:,:,:), snow_tau(:,:), degrau(:ncol,:),    &
+             dei(:ncol,:), des(:ncol,:), iclwpth, icswpth, icgrauwpth, ext_sw_liq, ssa_sw_liq, &
+                asm_sw_liq, ext_sw_ice, asm_sw_ice, ssa_sw_ice, g_mu, g_d_eff, g_lambda,&
+                idx_sw_diag, do_graupel, do_snow, kdist_sw, cloud_sw, c_cld_tau(:,:),        &
+             c_cld_tau_w(:,:), c_cld_tau_w_g(:,:), rd%tot_cld_vistau, rd%tot_icld_vistau, rd%liq_icld_vistau, rd%ice_icld_vistau, &
+             rd%snow_icld_vistau, rd%grau_icld_vistau, errmsg, errflg)
+         if (errflg /= 0) then
+            call endrun(sub//': '//errmsg)
+         end if
+
+         ! Cloud optics for COSP
+         cld_tau_cloudsim = cld_tau(idx_sw_cloudsim,:,:)
+         snow_tau_cloudsim = snow_tau(idx_sw_cloudsim,:,:)
+         grau_tau_cloudsim = grau_tau(idx_sw_cloudsim,:,:)
+
+         call rrtmgp_sw_mcica_subcol_gen_run(dosw, kdist_sw, nswbands, nswgpts, nday, nlay, &
+                 pver, tiny, idxday, ktopcam, ktoprad, cldfprime, c_cld_tau,   &
+                 c_cld_tau_w, c_cld_tau_w_g, cloud_sw, state%pmid(:ncol,:), errmsg, errflg)
 
          if (write_output) then
             call radiation_output_cld(lchnk, rd)
@@ -1190,7 +1245,11 @@ subroutine radiation_tend( &
                   !$acc end data
 
                   ! Scale the solar source
-                  call get_variability(toa_flux, sfac, band2gpt_sw, nswbands)
+                  call rrtmgp_sw_solar_var_run(toa_flux, band2gpt_sw, nswbands, sol_irrad, we, nbins, sol_tsi, &
+                                       do_spctrl_scaling, sfac, errmsg, errflg)
+                  if (errflg /= 0) then
+                     call endrun(sub//': '//errmsg)
+                  end if
                   toa_flux = toa_flux * sfac * eccf
 
                end if
@@ -1250,33 +1309,6 @@ subroutine radiation_tend( &
       !=======================!
 
       if (dolw) then
-
-         ! Grab additional pbuf fields for LW cloud optics
-         dei_idx = pbuf_get_index('DEI',errcode=err)
-         mu_idx  = pbuf_get_index('MU',errcode=err)
-         lambda_idx = pbuf_get_index('LAMBDAC',errcode=err)
-         iciwp_idx  = pbuf_get_index('ICIWP',errcode=err)
-         iclwp_idx  = pbuf_get_index('ICLWP',errcode=err)
-         des_idx    = pbuf_get_index('DES',errcode=err)
-         icswp_idx  = pbuf_get_index('ICSWP',errcode=err)
-         icgrauwp_idx  = pbuf_get_index('ICGRAUWP',errcode=err) ! Available when using MG3
-         degrau_idx    = pbuf_get_index('DEGRAU',errcode=err)   ! Available when using MG3
-         call pbuf_get_field(pbuf, lambda_idx,  lambda)
-         call pbuf_get_field(pbuf, mu_idx,      mu)
-         call pbuf_get_field(pbuf, iclwp_idx,   iclwp)
-         call pbuf_get_field(pbuf, iciwp_idx, iciwp)
-         call pbuf_get_field(pbuf, dei_idx,   dei)
-         call pbuf_get_field(pbuf, icswp_idx, icswp)
-         call pbuf_get_field(pbuf, des_idx,   des)
-         if (icgrauwp_idx > 0) then
-            call pbuf_get_field(pbuf, icgrauwp_idx, icgrauwp)
-         end if
-         if (degrau_idx > 0) then
-            call pbuf_get_field(pbuf, degrau_idx,   degrau)
-         end if
-
-         do_graupel = ((icgrauwp_idx > 0) .and. (degrau_idx > 0) .and. associated(cldfgrau)) .and. graupel_in_rad
-         do_snow = associated(cldfsnow)
 
          ! Set cloud optical properties in cloud_lw object.
          call rrtmgp_lw_cloud_optics_run(dolw, ncol, nlay, nlaycam, cld(:ncol,:), cldfsnow_in,  &
