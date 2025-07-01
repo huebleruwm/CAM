@@ -150,7 +150,6 @@ logical :: graupel_in_rad   = .false. ! graupel in radiation code
 logical :: use_rad_uniform_angle = .false. ! if true, use the namelist rad_uniform_angle for the coszrs calculation
 
 ! Gathered indices of day and night columns 
-!  chunk_column_index = IdxDay(daylight_column_index)
 integer :: nday           ! Number of daylight columns
 integer :: nnite          ! Number of night columns
 integer :: idxday(pcols)   ! chunk indices of daylight columns
@@ -397,9 +396,9 @@ function radiation_do(op)
    nstep = get_nstep()
 
    select case (op)
-      case ('sw') ! do a shortwave heating calc this timestep?
+      case ('sw') ! Set radiation_do to true if doing a shortwave heating calc this timestep
          call radiation_do_ccpp(op, nstep, iradsw, irad_always, radiation_do, errmsg, errcode)
-      case ('lw') ! do a longwave heating calc this timestep?
+      case ('lw') ! Set radiation_do to true if doing a longwave heating calc this timestep
          call radiation_do_ccpp(op, nstep, iradlw, irad_always, radiation_do, errmsg, errcode)
       case default
          call endrun('radiation_do: unknown operation:'//op)
@@ -471,7 +470,7 @@ subroutine radiation_init(pbuf2d)
                    pref_edge, nlay, pver, pverp, kdist_sw, kdist_lw, qrl_unused, is_first_step(), use_rad_dt_cosz, &
                    get_step_size(), get_nstep(), iradsw, dt_avg, irad_always, is_first_restart_step(), masterproc, &
                    nlwbands, nradgas, gasnamelength, iulog, idx_sw_diag, idx_nir_diag, idx_uv_diag,          &
-                   idx_sw_cloudsim, idx_lw_diag, idx_lw_cloudsim, gaslist, nswgpts, nlwgpts, nlayp,          &
+                   idx_sw_cloudsim, idx_lw_diag, idx_lw_cloudsim, nswgpts, nlwgpts, nlayp,                   &
                    nextsw_cday, get_curr_calday(), band2gpt_sw, errmsg, errflg)
    if (errflg /= 0) then
       call endrun(sub//': '//errmsg)
@@ -1008,6 +1007,7 @@ subroutine radiation_tend( &
    real(r8) :: gb_snow_lw(pcols,pver)  ! grid-box mean LW snow optical depth
 
    real(r8) :: ftem(pcols,pver)        ! Temporary workspace for outfld variables
+   real(r8), target :: zero_variable(1,1)
 
    character(len=128) :: errmsg
    integer            :: errflg, err
@@ -1016,6 +1016,9 @@ subroutine radiation_tend( &
 
    lchnk = state%lchnk
    ncol = state%ncol
+
+   ! Initialize dummy zero variable
+   zero_variable = 0._r8
 
    if (present(rd_out)) then
       rd => rd_out
@@ -1134,13 +1137,13 @@ subroutine radiation_tend( &
       if (associated(cldfgrau)) then
          cldfgrau_in => cldfgrau(:ncol,:)
       else
-         cldfgrau_in => null()
+         cldfgrau_in => zero_variable
       end if
 
       if (associated(cldfsnow)) then
          cldfsnow_in => cldfsnow(:ncol,:)
       else
-         cldfsnow_in => null()
+         cldfsnow_in => zero_variable
       end if
       ! Grab additional pbuf fields for LW cloud optics
       dei_idx = pbuf_get_index('DEI',errcode=err)
@@ -1179,7 +1182,7 @@ subroutine radiation_tend( &
                   ncol, ktopcam, ktoprad, nswbands, cam_in%asdir(:ncol), cam_in%asdif(:ncol), &
                   sw_low_bounds, sw_high_bounds, cam_in%aldir(:ncol), cam_in%aldif(:ncol), nlay, &
                   pverp, pver, cld(:ncol,:), cldfsnow_in, cldfgrau_in, &
-                  graupel_in_rad, gasnamelength, gaslist, gas_concs_lw, aer_lw, atm_optics_lw, &
+                  graupel_in_rad, gasnamelength, gaslist_lc, gas_concs_lw, aer_lw, atm_optics_lw, &
                   kdist_lw, sources_lw, aer_sw, atm_optics_sw, gas_concs_sw,   &
                   errmsg, errflg)
       if (errflg /= 0) then
@@ -1264,14 +1267,13 @@ subroutine radiation_tend( &
 
                   ! Increment the gas optics (in atm_optics_sw) by the aerosol optics in aer_sw.
                   !$acc data copyin(coszrs_day, toa_flux, alb_dir, alb_dif, &
-                  !$acc             atm_optics_sw%optical_props, atm_optics_sw%optical_props%tau, &
-                  !$acc             atm_optics_sw%optical_props%ssa, atm_optics_sw%optical_props%g, &
-                  !$acc             aer_sw%optical_props, aer_sw%optical_props%tau, &
-                  !$acc             aer_sw%optical_props%ssa, aer_sw%optical_props%g, &
-                  !$acc             cloud_sw%optical_props, cloud_sw%optical_props%tau, &
-                  !$acc             cloud_sw%optical_props%ssa, cloud_sw%optical_props%g) &
-                  !$acc        copy(fswc%fluxes, fswc%fluxes%flux_net,fswc%fluxes%flux_up,fswc%fluxes%flux_dn, &
-                  !$acc             fsw%fluxes, fsw%fluxes%flux_net, fsw%fluxes%flux_up, fsw%fluxes%flux_dn)
+                  !$acc             atm_optics_sw%optical_props, atm_optics_sw%optical_props%tau, atm_optics_sw%optical_props%ssa, &
+                  !$acc             atm_optics_sw%optical_props%g, aer_sw%optical_props%tau,          &
+                  !$acc             aer_sw%optical_props, aer_sw%optical_props%ssa, aer_sw%optical_props%g,                 &
+                  !$acc             cloud_sw%optical_props, cloud_sw%optical_props%tau, cloud_sw%optical_props%ssa,           &
+                  !$acc             cloud_sw%optical_props%g)                                         &
+                  !$acc        copy(fswc%fluxes, fswc%fluxes%flux_net,fswc%fluxes%flux_up,fswc%fluxes%flux_dn,     &
+                  !$acc             fsw%fluxes, fsw%fluxes%flux_net,fsw%fluxes%flux_up,fsw%fluxes%flux_dn)
                   errmsg = aer_sw%optical_props%increment(atm_optics_sw%optical_props)
                   call stop_on_err(errmsg, sub, 'aer_sw%optical_props%increment')
 
@@ -1350,12 +1352,14 @@ subroutine radiation_tend( &
                end if
 
                ! Compute the gas optics and Planck sources.
-               !$acc data copyin(kdist_lw%gas_props, pmid_rad, pint_rad, &
-               !$acc             t_rad, t_sfc, gas_concs_lw%gas_concs) &
-               !$acc        copy(atm_optics_lw%optical_props, atm_optics_lw%optical_props%tau, &
-               !$acc             sources_lw%sources, sources_lw%sources%lay_source, &
-               !$acc             sources_lw%sources%sfc_source, sources_lw%sources%lev_source_inc, &
-               !$acc             sources_lw%sources%lev_source_dec, sources_lw%sources%sfc_source_jac)
+               !$acc data copyin(kdist_lw%gas_props, pmid_rad, pint_rad, t_rad,  &
+               !$acc             t_sfc, gas_concs_lw%gas_concs)                  &
+               !$acc        copy(atm_optics_lw%optical_props, atm_optics_lw%optical_props%tau,                &
+               !$acc             sources_lw%sources, sources_lw%sources%lay_source,                  &
+               !$acc             sources_lw%sources%sfc_source,                  &
+               !$acc             sources_lw%sources%lev_source_inc,              &
+               !$acc             sources_lw%sources%lev_source_dec,              &
+               !$acc             sources_lw%sources%sfc_source_jac)
                call rrtmgp_lw_gas_optics_run(dolw, 1, ncol, ncol, pmid_rad, pint_rad, t_rad,  &
                   t_sfc, gas_concs_lw, atm_optics_lw, sources_lw, t_rad, .false., kdist_lw, errmsg, &
                   errflg)
@@ -1368,15 +1372,19 @@ subroutine radiation_tend( &
                call rrtmgp_set_aer_lw(icall, state, pbuf, aer_lw)
 
                ! Call the main rrtmgp_lw driver
-               !$acc data copyin(atm_optics_lw%optical_props, atm_optics_lw%optical_props%tau, &
-               !$acc             aer_lw%optical_props, aer_lw%optical_props%tau, &
-               !$acc             cloud_lw%optical_props, cloud_lw%optical_props%tau, &
-               !$acc             sources_lw%sources, sources_lw%sources%lay_source, &
-               !$acc             sources_lw%sources%sfc_source, sources_lw%sources%lev_source_inc, &
-               !$acc             sources_lw%sources%lev_source_dec, sources_lw%sources%sfc_source_Jac, &
-               !$acc             emis_sfc)  &
-               !$acc        copy(flwc%fluxes, flwc%fluxes%flux_net, flwc%fluxes%flux_up, flwc%fluxes%flux_dn, &
-               !$acc             flw, flw%fluxes%flux_net, flw%fluxes%flux_up, flw%fluxes%flux_dn)
+               !$acc data copyin(atm_optics_lw%optical_props,atm_optics_lw%optical_props%tau,   &
+               !$acc             aer_lw%optical_props,aer_lw%optical_props%tau,          &
+               !$acc             cloud_lw%optical_props, cloud_lw%optical_props%tau,        &
+               !$acc             sources_lw%sources,sources_lw%sources%lay_source,     &
+               !$acc             sources_lw%sources%sfc_source,     &
+               !$acc             sources_lw%sources%lev_source_inc, &
+               !$acc             sources_lw%sources%lev_source_dec, &
+               !$acc             sources_lw%sources%sfc_source_jac, &
+               !$acc             emis_sfc)                          &
+               !$acc        copy(flwc%fluxes, flwc%fluxes%flux_net, flwc%fluxes%flux_up, &
+               !$acc             flwc%fluxes%flux_dn, flw%fluxes, flw%fluxes%flux_net,  &
+               !$acc             flw%fluxes%flux_up, flw%fluxes%flux_dn,    &
+               !$acc             lw_ds)
                call rrtmgp_lw_main_run(dolw, dolw, .false., .false., .false., &
                                  0, ncol, 1, ncol, atm_optics_lw, &
                                  cloud_lw, top_at_1, sources_lw, emis_sfc, kdist_lw, &
@@ -1487,8 +1495,9 @@ subroutine radiation_tend( &
    cam_out%netsw(:) = 0._r8
 
    ! Calculate radiative heating (Q*dp), set netsw flux, and do object cleanup
-   call rrtmgp_post_run(qrs_prime(:ncol,:), qrl_prime(:ncol,:), fsns(:ncol), state%pdel(:ncol,:), atm_optics_sw, cloud_sw, aer_sw, &
-                  fsw, fswc, sources_lw, cloud_lw, aer_lw, flw, flwc, qrs(:ncol,:), qrl(:ncol,:), cam_out%netsw(:ncol), errmsg, errflg)
+   call rrtmgp_post_run(qrs_prime(:ncol,:), qrl_prime(:ncol,:), fsns(:ncol), state%pdel(:ncol,:), atm_optics_sw, cloud_sw, &
+           aer_sw, fsw, fswc, atm_optics_lw, sources_lw, cloud_lw, aer_lw, flw, flwc, qrs(:ncol,:), qrl(:ncol,:),          &
+           cam_out%netsw(:ncol), errmsg, errflg)
    if (errflg /= 0) then
      call endrun(sub//': '//errmsg)
    end if
