@@ -1356,7 +1356,7 @@ subroutine radiation_tend( &
                !$acc             lw_ds)
                call rrtmgp_lw_main_run(dolw, dolw, .false., .false., .false., &
                                  0, ncol, 1, ncol, atm_optics_lw, &
-                                 cloud_lw, top_at_1, sources_lw, emis_sfc, kdist_lw, &
+                                 cloud_lw, sources_lw, emis_sfc, kdist_lw, &
                                  aer_lw, fluxlwup_jac, lw_ds, flwc, flw, errmsg, errflg)
                if (errflg /= 0) then
                   call endrun(sub//': '//errmsg)
