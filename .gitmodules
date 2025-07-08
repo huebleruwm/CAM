@@ -79,7 +79,7 @@
 	path = src/physics/rrtmgp/ext
 	url = https://github.com/earth-system-radiation/rte-rrtmgp.git
         fxrequired = AlwaysRequired
-        fxtag = 77ff83ccf645e5bc404c138ca4e7a6e3abf5d963
+	fxtag = v1.9.2
         fxDONOTUSEurl = https://github.com/earth-system-radiation/rte-rrtmgp.git
 
 [submodule "rrtmgp-data"]
