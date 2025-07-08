@@ -421,16 +421,16 @@ end function radiation_do
 !================================================================================================
 
 subroutine radiation_init(pbuf2d)
-   use rrtmgp_pre,             only: rrtmgp_pre_init
-   use rrtmgp_inputs,          only: rrtmgp_inputs_init
-   use rrtmgp_inputs_cam,      only: rrtmgp_inputs_cam_init
-   use rrtmgp_lw_cloud_optics, only: rrtmgp_lw_cloud_optics_init
-   use rrtmgp_sw_solar_var,    only: rrtmgp_sw_solar_var_init
-   use solar_irrad_data,       only: do_spctrl_scaling, has_spectrum
-   use cloud_rad_props,        only: cloud_rad_props_init
-   use rad_constituents,       only: iceopticsfile, liqopticsfile
-   use rrtmgp_lw_gas_optics,   only: rrtmgp_lw_gas_optics_init
-   use rrtmgp_sw_gas_optics,   only: rrtmgp_sw_gas_optics_init
+   use rrtmgp_pre,                only: rrtmgp_pre_init
+   use rrtmgp_inputs_setup,       only: rrtmgp_inputs_setup_init
+   use rrtmgp_inputs_cam,         only: rrtmgp_inputs_cam_init
+   use rrtmgp_cloud_optics_setup, only: rrtmgp_cloud_optics_setup_init
+   use rrtmgp_sw_solar_var,       only: rrtmgp_sw_solar_var_init
+   use solar_irrad_data,          only: do_spctrl_scaling, has_spectrum
+   use cloud_rad_props,           only: cloud_rad_props_init
+   use rad_constituents,          only: iceopticsfile, liqopticsfile
+   use rrtmgp_lw_gas_optics,      only: rrtmgp_lw_gas_optics_init
+   use rrtmgp_sw_gas_optics,      only: rrtmgp_sw_gas_optics_init
 
    ! Initialize the radiation and cloud optics.
    ! Add fields to the history buffer.
@@ -840,8 +840,7 @@ subroutine radiation_tend( &
    use rrtmgp_sw_cloud_optics,            only: rrtmgp_sw_cloud_optics_run
 
    use rrtmgp_inputs_cam,                 only: rrtmgp_get_gas_mmrs, rrtmgp_set_aer_lw, &
-                                                rrtmgp_set_gases_sw, rrtmgp_set_cloud_sw, &
-                                                rrtmgp_set_aer_sw
+                                                rrtmgp_set_gases_sw, rrtmgp_set_aer_sw
 
    ! RRTMGP drivers for flux calculations.
    use mo_rte_lw,                         only: rte_lw
@@ -901,11 +900,11 @@ subroutine radiation_tend( &
    real(r8)          :: snow_lw_abs(nlwbands,state%ncol,pver) ! Snow absorption optics depth
    real(r8)          :: grau_lw_abs(nlwbands,state%ncol,pver) ! Graupel absorption optics depth
    real(r8)          :: cld_tau(nswbands,state%ncol,pver)  ! Cloud absorption optics depth (sw)
-   real(r8)          :: snow_tau(nlwbands,state%ncol,pver) ! Snow absorption optics depth (sw)
-   real(r8)          :: grau_tau(nlwbands,state%ncol,pver) ! Graupel absorption optics depth (sw)
-   real(r8)          :: c_cld_tau(nlwbands,state%ncol,pver)
-   real(r8)          :: c_cld_tau_w(nlwbands,state%ncol,pver)
-   real(r8)          :: c_cld_tau_w_g(nlwbands,state%ncol,pver)
+   real(r8)          :: snow_tau(nswbands,state%ncol,pver) ! Snow absorption optics depth (sw)
+   real(r8)          :: grau_tau(nswbands,state%ncol,pver) ! Graupel absorption optics depth (sw)
+   real(r8)          :: c_cld_tau(nswbands,state%ncol,pver)
+   real(r8)          :: c_cld_tau_w(nswbands,state%ncol,pver)
+   real(r8)          :: c_cld_tau_w_g(nswbands,state%ncol,pver)
    real(r8), pointer :: qrs(:,:) ! shortwave radiative heating rate adjusted by air pressure thickness
    real(r8), pointer :: qrl(:,:) ! longwave  radiative heating rate adjusted by air pressure thickness
    real(r8)          :: qrs_prime(pcols, pver) ! shortwave heating rate
@@ -1020,7 +1019,7 @@ subroutine radiation_tend( &
    real(r8) :: ftem(pcols,pver)        ! Temporary workspace for outfld variables
    real(r8), target :: zero_variable(1,1)
 
-   character(len=128) :: errmsg
+   character(len=512) :: errmsg
    integer            :: errflg, err
    character(len=*), parameter :: sub = 'radiation_tend'
    !--------------------------------------------------------------------------------------
@@ -1212,25 +1211,26 @@ subroutine radiation_tend( &
 
          ! Set cloud optical properties in cloud_sw object.
          call rrtmgp_sw_cloud_optics_run(dosw, ncol, pver, ktopcam, ktoprad, nlay, nswgpts, nday, idxday, &
-             fillvalue, nswbands, iulog, mu(:ncol,:), lambda(:ncol,:), nnite, idxnite, cld, cldfsnow(:ncol,:), &
-             cldfgrau(:ncol,:), cldfprime(:,:,:), cld_tau(:,:,:), grau_tau(:,:,:), snow_tau(:,:), degrau(:ncol,:),    &
-             dei(:ncol,:), des(:ncol,:), iclwpth, icswpth, icgrauwpth, ext_sw_liq, ssa_sw_liq, &
+             fillvalue, nswbands, iulog, mu(:ncol,:), lambda(:ncol,:), nnite, idxnite, cld, cldfsnow(:,:), &
+             cldfgrau(:,:), cldfprime(:ncol,:), cld_tau(:,:ncol,:), grau_tau(:,:ncol,:), snow_tau(:,:ncol,:), degrau(:ncol,:),    &
+             dei(:ncol,:), des(:ncol,:), iclwp(:ncol,:), iciwp(:ncol,:), icswp(:ncol,:), icgrauwp(:ncol,:), tiny, ext_sw_liq, ssa_sw_liq, &
                 asm_sw_liq, ext_sw_ice, asm_sw_ice, ssa_sw_ice, g_mu, g_d_eff, g_lambda,&
-                idx_sw_diag, do_graupel, do_snow, kdist_sw, cloud_sw, c_cld_tau(:,:),        &
-             c_cld_tau_w(:,:), c_cld_tau_w_g(:,:), rd%tot_cld_vistau, rd%tot_icld_vistau, rd%liq_icld_vistau, rd%ice_icld_vistau, &
-             rd%snow_icld_vistau, rd%grau_icld_vistau, errmsg, errflg)
+                idx_sw_diag, do_graupel, do_snow, kdist_sw, c_cld_tau(:,:ncol,:),        &
+             c_cld_tau_w(:,:ncol,:), c_cld_tau_w_g(:,:ncol,:), rd%tot_cld_vistau(:ncol,:), rd%tot_icld_vistau(:ncol,:), &
+             rd%liq_icld_vistau(:ncol,:), rd%ice_icld_vistau(:ncol,:), &
+             rd%snow_icld_vistau(:ncol,:), rd%grau_icld_vistau(:ncol,:), errmsg, errflg)
          if (errflg /= 0) then
             call endrun(sub//': '//errmsg)
          end if
 
          ! Cloud optics for COSP
-         cld_tau_cloudsim = cld_tau(idx_sw_cloudsim,:,:)
-         snow_tau_cloudsim = snow_tau(idx_sw_cloudsim,:,:)
-         grau_tau_cloudsim = grau_tau(idx_sw_cloudsim,:,:)
+         cld_tau_cloudsim(:ncol,:) = cld_tau(idx_sw_cloudsim,:,:)
+         snow_tau_cloudsim(:ncol,:) = snow_tau(idx_sw_cloudsim,:,:)
+         grau_tau_cloudsim(:ncol,:) = grau_tau(idx_sw_cloudsim,:,:)
 
          call rrtmgp_sw_mcica_subcol_gen_run(dosw, kdist_sw, nswbands, nswgpts, nday, nlay, &
                  pver, tiny, idxday, ktopcam, ktoprad, cldfprime, c_cld_tau,   &
-                 c_cld_tau_w, c_cld_tau_w_g, cloud_sw, state%pmid(:ncol,:), errmsg, errflg)
+                 c_cld_tau_w, c_cld_tau_w_g, cloud_sw, pmid_day(:ncol,:), errmsg, errflg)
 
          if (write_output) then
             call radiation_output_cld(lchnk, rd)
