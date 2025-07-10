@@ -1,5 +1,5 @@
 ./xmlchange ROF_NCPL=\$ATM_NCPL
 ./xmlchange GLC_NCPL=\$ATM_NCPL
-./xmlchange -append CAM_CONFIG_OPTS="-cosp"
+./xmlchange --append CAM_CONFIG_OPTS="-cosp"
 ./xmlchange RUN_STARTDATE="19951231"
 ./xmlchange START_TOD="82800"
