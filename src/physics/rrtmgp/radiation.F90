@@ -838,6 +838,7 @@ subroutine radiation_tend( &
    use rrtmgp_sw_solar_var,               only: rrtmgp_sw_solar_var_run
    use rrtmgp_sw_mcica_subcol_gen,        only: rrtmgp_sw_mcica_subcol_gen_run
    use rrtmgp_sw_cloud_optics,            only: rrtmgp_sw_cloud_optics_run
+   use rrtmgp_sw_gas_optics,              only: rrtmgp_sw_gas_optics_run
 
    use rrtmgp_inputs_cam,                 only: rrtmgp_get_gas_mmrs, rrtmgp_set_aer_lw, &
                                                 rrtmgp_set_gases_sw, rrtmgp_set_aer_sw
@@ -1252,19 +1253,19 @@ subroutine radiation_tend( &
                   !$acc data copyin(kdist_sw%gas_props,pmid_day,pint_day,t_day,gas_concs_sw%gas_concs) &
                   !$acc        copy(atm_optics_sw%optical_props) &
                   !$acc     copyout(toa_flux)
-                  errmsg = kdist_sw%gas_props%gas_optics( &
-                     pmid_day, pint_day, t_day, gas_concs_sw%gas_concs, atm_optics_sw%optical_props, &
-                     toa_flux)
-                  call stop_on_err(errmsg, sub, 'kdist_sw%gas_props%gas_optics')
+                  call rrtmgp_sw_gas_optics_run(dosw, 1, nday, nday, pmid_day, pint_day, t_day,  &
+                               gas_concs_sw, atm_optics_sw, kdist_sw, toa_flux, errmsg, errflg)
+                  if (errflg /= 0) then
+                     call endrun(sub//': '//errmsg)
+                  end if
                   !$acc end data
 
                   ! Scale the solar source
                   call rrtmgp_sw_solar_var_run(toa_flux, band2gpt_sw, nswbands, sol_irrad, we, nbins, sol_tsi, &
-                                       do_spctrl_scaling, sfac, errmsg, errflg)
+                                       do_spctrl_scaling, sfac, eccf, errmsg, errflg)
                   if (errflg /= 0) then
                      call endrun(sub//': '//errmsg)
                   end if
-                  toa_flux = toa_flux * sfac * eccf
 
                end if
 
