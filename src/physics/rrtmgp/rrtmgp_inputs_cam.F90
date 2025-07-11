@@ -49,7 +49,6 @@ save
 public :: &
    rrtmgp_inputs_cam_init, &
    rrtmgp_get_gas_mmrs, &
-   rrtmgp_set_gases_sw, &
    rrtmgp_set_aer_lw,   &
    rrtmgp_set_aer_sw
 
@@ -115,158 +114,6 @@ end subroutine rrtmgp_inputs_cam_init
 
 !=========================================================================================
 
-function get_molar_mass_ratio(gas_name) result(massratio)
-
-   ! return the molar mass ratio of dry air to gas based on gas_name
-
-   character(len=*),intent(in) :: gas_name
-   real(r8)                    :: massratio
-
-   ! local variables
-   real(r8), parameter :: amdw = 1.607793_r8    ! Molecular weight of dry air / water vapor
-   real(r8), parameter :: amdc = 0.658114_r8    ! Molecular weight of dry air / carbon dioxide
-   real(r8), parameter :: amdo = 0.603428_r8    ! Molecular weight of dry air / ozone
-   real(r8), parameter :: amdm = 1.805423_r8    ! Molecular weight of dry air / methane
-   real(r8), parameter :: amdn = 0.658090_r8    ! Molecular weight of dry air / nitrous oxide
-   real(r8), parameter :: amdo2 = 0.905140_r8   ! Molecular weight of dry air / oxygen
-   real(r8), parameter :: amdc1 = 0.210852_r8   ! Molecular weight of dry air / CFC11
-   real(r8), parameter :: amdc2 = 0.239546_r8   ! Molecular weight of dry air / CFC12
-
-   character(len=*), parameter :: sub='get_molar_mass_ratio'
-   !----------------------------------------------------------------------------
-
-   select case (trim(gas_name)) 
-      case ('H2O') 
-         massratio = amdw
-      case ('CO2')
-         massratio = amdc
-      case ('O3')
-         massratio = amdo
-      case ('CH4')
-         massratio = amdm
-      case ('N2O')
-         massratio = amdn
-      case ('O2')
-         massratio = amdo2
-      case ('CFC11')
-         massratio = amdc1
-      case ('CFC12')
-         massratio = amdc2
-      case default
-         call endrun(sub//": Invalid gas: "//trim(gas_name))
-   end select
-
-end function get_molar_mass_ratio
-
-!=========================================================================================
-
-subroutine rad_gas_get_vmr(icall, gas_name, state, pbuf, nlay, numactivecols, gas_concs, idxday)
-
-   ! Set volume mixing ratio in gas_concs object.
-   ! The gas_concs%set_vmr method copies data into internally allocated storage.
-
-   integer,                     intent(in) :: icall      ! index of climate/diagnostic radiation call
-   character(len=*),            intent(in) :: gas_name
-   type(physics_state), target, intent(in) :: state
-   type(physics_buffer_desc),   pointer    :: pbuf(:)
-   integer,                     intent(in) :: nlay           ! number of layers in radiation calculation
-   integer,                     intent(in) :: numactivecols  ! number of columns, ncol for LW, nday for SW
-
-   type(ty_gas_concs_ccpp),     intent(inout) :: gas_concs  ! the result is VMR inside gas_concs
-
-   integer, optional,          intent(in) :: idxday(:)   ! indices of daylight columns in a chunk
-
-   ! Local variables
-   integer :: i, idx(numactivecols)
-   integer :: istat
-   real(r8), pointer     :: gas_mmr(:,:)
-   real(r8), allocatable :: gas_vmr(:,:)
-   real(r8), allocatable :: mmr(:,:)
-   real(r8) :: massratio
-
-   ! For ozone profile above model
-   real(r8) :: P_top, P_int, P_mid, alpha, beta, a, b, chi_mid, chi_0, chi_eff
-
-   character(len=128)          :: errmsg
-   character(len=*), parameter :: sub = 'rad_gas_get_vmr'
-   !----------------------------------------------------------------------------
-
-   ! set the column indices; when idxday is provided (e.g. daylit columns) use them, otherwise just count.
-   do i = 1, numactivecols
-      if (present(idxday)) then
-         idx(i) = idxday(i)
-      else
-         idx(i) = i
-      end if
-   end do
-
-   ! gas_mmr points to a "chunk" in either the state or pbuf objects.  That storage is
-   ! dimensioned (pcols,pver).
-   call rad_cnst_get_gas(icall, gas_name, state, pbuf, gas_mmr)
-
-   ! Copy into storage for RRTMGP
-   allocate(mmr(numactivecols, nlay), stat=istat)
-   call alloc_err(istat, sub, 'mmr', numactivecols*nlay)
-   allocate(gas_vmr(numactivecols, nlay), stat=istat)
-   call alloc_err(istat, sub, 'gas_vmr', numactivecols*nlay)
-
-   do i = 1, numactivecols
-      mmr(i,ktoprad:) = gas_mmr(idx(i),ktopcam:)
-   end do
-
-   ! If an extra layer is being used, copy mmr from the top layer of CAM to the extra layer.
-   if (nlay == pverp) then
-      mmr(:,1) = mmr(:,2)
-   end if
-
-   ! special case: H2O is specific humidity, not mixing ratio. Use r = q/(1-q):
-   if (gas_name == 'H2O') then 
-      mmr = mmr / (1._r8 - mmr)
-   end if  
-
-   ! convert MMR to VMR, multipy by ratio of dry air molar mas to gas molar mass.
-   massratio = get_molar_mass_ratio(gas_name)
-   gas_vmr = mmr * massratio
-
-   ! special case: Setting O3 in the extra layer:
-   ! 
-   ! For the purpose of attenuating solar fluxes above the CAM model top, we assume that ozone 
-   ! mixing decreases linearly in each column from the value in the top layer of CAM to zero at 
-   ! the pressure level set by P_top. P_top has been set to 50 Pa (0.5 hPa) based on model tuning 
-   ! to produce temperatures at the top of CAM that are most consistent with WACCM at similar pressure levels. 
-
-   if ((gas_name == 'O3') .and. (nlay == pverp)) then
-      P_top = 50.0_r8
-      do i = 1, numactivecols
-            P_int = state%pint(idx(i),1) ! pressure (Pa) at upper interface of CAM
-            P_mid = state%pmid(idx(i),1) ! pressure (Pa) at midpoint of top layer of CAM
-            alpha = log(P_int/P_top)
-            beta =  log(P_mid/P_int)/log(P_mid/P_top)
-      
-            a =  ( (1._r8 + alpha) * exp(-alpha) - 1._r8 ) / alpha
-            b =  1._r8 - exp(-alpha)
-   
-            if (alpha .gt. 0) then             ! only apply where top level is below 80 km
-               chi_mid = gas_vmr(i,1)          ! molar mixing ratio of O3 at midpoint of top layer
-               chi_0 = chi_mid /  (1._r8 + beta)
-               chi_eff = chi_0 * (a + b)
-               gas_vmr(i,1) = chi_eff
-            end if
-      end do
-   end if
-
-   errmsg = gas_concs%gas_concs%set_vmr(gas_name, gas_vmr)
-   if (len_trim(errmsg) > 0) then
-      call endrun(sub//': ERROR, gas_concs%set_vmr: '//trim(errmsg))
-   end if
-
-   deallocate(gas_vmr)
-   deallocate(mmr)
-
-end subroutine rad_gas_get_vmr
-
-!==================================================================================================
-
 subroutine rrtmgp_get_gas_mmrs(icall, state, pbuf, nlay, gas_mmrs)
 
    ! Retrieve mass mixing ratios for radiatively active gases from rad_constituents
@@ -290,36 +137,6 @@ subroutine rrtmgp_get_gas_mmrs(icall, state, pbuf, nlay, gas_mmrs)
       gas_mmrs(:,:,i) = gas_mmr(:ncol,:)
    end do
 end subroutine rrtmgp_get_gas_mmrs
-
-!==================================================================================================
-
-subroutine rrtmgp_set_gases_sw( &
-   icall, state, pbuf, nlay, nday, &
-   idxday, gas_concs)
-
-   ! Return gas_concs with gas volume mixing ratio on DAYLIT columns.
-   ! Set all gases in radconstants gaslist.
-
-   ! arguments
-   integer,                     intent(in)    :: icall      ! index of climate/diagnostic radiation call
-   type(physics_state), target, intent(in)    :: state
-   type(physics_buffer_desc),   pointer       :: pbuf(:)
-   integer,                     intent(in)    :: nlay
-   integer,                     intent(in)    :: nday
-   integer,                     intent(in)    :: idxday(:)
-   type(ty_gas_concs_ccpp),     intent(inout) :: gas_concs
-
-   ! local variables
-   integer :: i
-   character(len=*), parameter :: sub = 'rrtmgp_set_gases_sw'
-   !----------------------------------------------------------------------------
-
-   ! use the optional argument idxday to specify which columns are sunlit
-    do i = 1,nradgas
-      call rad_gas_get_vmr(icall, gaslist(i), state, pbuf, nlay, nday, gas_concs, idxday=idxday)
-   end do
-
-end subroutine rrtmgp_set_gases_sw
 
 !==================================================================================================
 

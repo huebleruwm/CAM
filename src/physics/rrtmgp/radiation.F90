@@ -838,10 +838,11 @@ subroutine radiation_tend( &
    use rrtmgp_sw_solar_var,               only: rrtmgp_sw_solar_var_run
    use rrtmgp_sw_mcica_subcol_gen,        only: rrtmgp_sw_mcica_subcol_gen_run
    use rrtmgp_sw_cloud_optics,            only: rrtmgp_sw_cloud_optics_run
+   use rrtmgp_sw_gas_optics_pre,          only: rrtmgp_sw_gas_optics_pre_run
    use rrtmgp_sw_gas_optics,              only: rrtmgp_sw_gas_optics_run
 
    use rrtmgp_inputs_cam,                 only: rrtmgp_get_gas_mmrs, rrtmgp_set_aer_lw, &
-                                                rrtmgp_set_gases_sw, rrtmgp_set_aer_sw
+                                                rrtmgp_set_aer_sw
 
    ! RRTMGP drivers for flux calculations.
    use mo_rte_lw,                         only: rte_lw
@@ -1243,10 +1244,16 @@ subroutine radiation_tend( &
 
                if (nday > 0) then
 
+                  ! Grab the gas mass mixing ratios from rad_constituents
+                  gas_mmrs = 0._r8
+                  call rrtmgp_get_gas_mmrs(icall, state, pbuf, nlay, gas_mmrs)
+
                   ! Set gas volume mixing ratios for this call in gas_concs_sw.
-                  call rrtmgp_set_gases_sw( &
-                     icall, state, pbuf, nlay, nday, &
-                     idxday, gas_concs_sw)
+                  call rrtmgp_sw_gas_optics_pre_run(gas_mmrs, state%pmid(:ncol,:), state%pint(:ncol,:), nlay, nday, gaslist, idxday, &
+                                    pverp, ktoprad, ktopcam, dosw, nradgas, gas_concs_sw, errmsg, errflg)
+                  if (errflg /= 0) then
+                     call endrun(sub//': '//errmsg)
+                  end if
 
                   ! Compute the gas optics (stored in atm_optics_sw).
                   ! toa_flux is the reference solar source from RRTMGP data.
@@ -1359,7 +1366,7 @@ subroutine radiation_tend( &
 
                ! Set gas volume mixing ratios for this call in gas_concs_lw
                call rrtmgp_lw_gas_optics_pre_run(gas_mmrs, state%pmid(:ncol,:), state%pint(:ncol,:), nlay, ncol, gaslist, &
-                  idxday, pverp, ktoprad, ktopcam, dolw, nradgas, gas_concs_lw, errmsg, errflg)
+                  pverp, ktoprad, ktopcam, dolw, nradgas, gas_concs_lw, errmsg, errflg)
                if (errflg /= 0) then
                   call endrun(sub//': '//errmsg)
                end if
