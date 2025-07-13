@@ -840,6 +840,7 @@ subroutine radiation_tend( &
    use rrtmgp_sw_cloud_optics,            only: rrtmgp_sw_cloud_optics_run
    use rrtmgp_sw_gas_optics_pre,          only: rrtmgp_sw_gas_optics_pre_run
    use rrtmgp_sw_gas_optics,              only: rrtmgp_sw_gas_optics_run
+   use rrtmgp_sw_main,                    only: rrtmgp_sw_main_run
 
    use rrtmgp_inputs_cam,                 only: rrtmgp_get_gas_mmrs, rrtmgp_set_aer_lw, &
                                                 rrtmgp_set_aer_sw
@@ -1293,24 +1294,11 @@ subroutine radiation_tend( &
                   !$acc             cloud_sw%optical_props%g)                                         &
                   !$acc        copy(fswc%fluxes, fswc%fluxes%flux_net,fswc%fluxes%flux_up,fswc%fluxes%flux_dn,     &
                   !$acc             fsw%fluxes, fsw%fluxes%flux_net,fsw%fluxes%flux_up,fsw%fluxes%flux_dn)
-                  errmsg = aer_sw%optical_props%increment(atm_optics_sw%optical_props)
-                  call stop_on_err(errmsg, sub, 'aer_sw%optical_props%increment')
-
-                  ! Compute clear-sky fluxes.
-                  errmsg = rte_sw(&
-                     atm_optics_sw%optical_props, top_at_1, coszrs_day, toa_flux, &
-                     alb_dir, alb_dif, fswc%fluxes)
-                  call stop_on_err(errmsg, sub, 'clear-sky rte_sw')
-
-                  ! Increment the aerosol+gas optics (in atm_optics_sw) by the cloud optics in cloud_sw.
-                  errmsg = cloud_sw%optical_props%increment(atm_optics_sw%optical_props)
-                  call stop_on_err(errmsg, sub, 'cloud_sw%optical_props%increment')
-
-                  ! Compute all-sky fluxes.
-                  errmsg = rte_sw(&
-                     atm_optics_sw%optical_props, top_at_1, coszrs_day, toa_flux, &
-                     alb_dir, alb_dif, fsw%fluxes)
-                  call stop_on_err(errmsg, sub, 'all-sky rte_sw')
+                  call rrtmgp_sw_main_run(dosw, .true., .true., nday, 1, nday, atm_optics_sw, cloud_sw, top_at_1,  &
+                                 aer_sw, coszrs_day, toa_flux, alb_dir, alb_dif, fswc, fsw, errmsg, errflg)
+                  if (errflg /= 0) then
+                     call endrun(sub//': '//errmsg)
+                  end if
                   !$acc end data
                end if
 
@@ -1406,9 +1394,9 @@ subroutine radiation_tend( &
                !$acc             flw%fluxes%flux_up, flw%fluxes%flux_dn,    &
                !$acc             lw_ds)
                call rrtmgp_lw_main_run(dolw, dolw, .false., .false., .false., &
-                                 0, ncol, 1, ncol, atm_optics_lw, &
-                                 cloud_lw, top_at_1, sources_lw, emis_sfc, kdist_lw, &
-                                 aer_lw, fluxlwup_jac, lw_ds, flwc, flw, errmsg, errflg)
+                                 0, atm_optics_lw, cloud_lw, top_at_1, sources_lw, &
+                                 emis_sfc, kdist_lw, aer_lw, fluxlwup_jac, lw_ds,  &
+                                 flwc, flw, errmsg, errflg)
                if (errflg /= 0) then
                   call endrun(sub//': '//errmsg)
                end if
