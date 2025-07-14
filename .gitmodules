@@ -36,7 +36,7 @@
 [submodule "atmos_phys"]
 	path = src/atmos_phys
 	url = https://github.com/peverwhee/atmospheric_physics
-        fxtag = 912bec257dfab3d5c90589e4ecace18a5ce5fe10
+        fxtag = e324603cdb8d24cc4781a67c87ea791409e7b4df
         fxrequired = AlwaysRequired
 	fxDONOTUSEurl = https://github.com/ESCOMP/atmospheric_physics
 
@@ -74,13 +74,6 @@
         fxtag = hemco-cesm2_2_0_hemco3_10_3
         fxrequired = AlwaysRequired
 	fxDONOTUSEurl = https://github.com/ESCOMP/HEMCO_CESM.git
-
-[submodule "rte-rrtmgp"]
-	path = src/physics/rrtmgp/ext
-	url = https://github.com/earth-system-radiation/rte-rrtmgp.git
-        fxrequired = AlwaysRequired
-        fxtag = v1.7
-        fxDONOTUSEurl = https://github.com/earth-system-radiation/rte-rrtmgp.git
 
 [submodule "rrtmgp-data"]
 	path = src/physics/rrtmgp/data

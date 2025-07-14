@@ -832,7 +832,7 @@ subroutine radiation_tend( &
    use rrtmgp_lw_mcica_subcol_gen,        only: rrtmgp_lw_mcica_subcol_gen_run
    use rrtmgp_lw_gas_optics_pre,          only: rrtmgp_lw_gas_optics_pre_run
    use rrtmgp_lw_gas_optics,              only: rrtmgp_lw_gas_optics_run
-   use rrtmgp_lw_main,                    only: rrtmgp_lw_main_run
+   use rrtmgp_lw_rte,                    only: rrtmgp_lw_rte_run
    use rrtmgp_dry_static_energy_tendency, only: rrtmgp_dry_static_energy_tendency_run
    use rrtmgp_post,                       only: rrtmgp_post_run
    use rrtmgp_sw_solar_var,               only: rrtmgp_sw_solar_var_run
@@ -840,7 +840,7 @@ subroutine radiation_tend( &
    use rrtmgp_sw_cloud_optics,            only: rrtmgp_sw_cloud_optics_run
    use rrtmgp_sw_gas_optics_pre,          only: rrtmgp_sw_gas_optics_pre_run
    use rrtmgp_sw_gas_optics,              only: rrtmgp_sw_gas_optics_run
-   use rrtmgp_sw_main,                    only: rrtmgp_sw_main_run
+   use rrtmgp_sw_rte,                    only: rrtmgp_sw_rte_run
 
    use rrtmgp_inputs_cam,                 only: rrtmgp_get_gas_mmrs, rrtmgp_set_aer_lw, &
                                                 rrtmgp_set_aer_sw
@@ -1294,7 +1294,7 @@ subroutine radiation_tend( &
                   !$acc             cloud_sw%optical_props%g)                                         &
                   !$acc        copy(fswc%fluxes, fswc%fluxes%flux_net,fswc%fluxes%flux_up,fswc%fluxes%flux_dn,     &
                   !$acc             fsw%fluxes, fsw%fluxes%flux_net,fsw%fluxes%flux_up,fsw%fluxes%flux_dn)
-                  call rrtmgp_sw_main_run(dosw, .true., .true., nday, 1, nday, atm_optics_sw, cloud_sw, top_at_1,  &
+                  call rrtmgp_sw_rte_run(dosw, .true., .true., nday, 1, nday, atm_optics_sw, cloud_sw, top_at_1,  &
                                  aer_sw, coszrs_day, toa_flux, alb_dir, alb_dif, fswc, fsw, errmsg, errflg)
                   if (errflg /= 0) then
                      call endrun(sub//': '//errmsg)
@@ -1393,7 +1393,7 @@ subroutine radiation_tend( &
                !$acc             flwc%fluxes%flux_dn, flw%fluxes, flw%fluxes%flux_net,  &
                !$acc             flw%fluxes%flux_up, flw%fluxes%flux_dn,    &
                !$acc             lw_ds)
-               call rrtmgp_lw_main_run(dolw, dolw, .false., .false., .false., &
+               call rrtmgp_lw_rte_run(dolw, dolw, .false., .false., .false., &
                                  0, atm_optics_lw, cloud_lw, top_at_1, sources_lw, &
                                  emis_sfc, kdist_lw, aer_lw, fluxlwup_jac, lw_ds,  &
                                  flwc, flw, errmsg, errflg)
