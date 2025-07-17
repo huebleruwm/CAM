@@ -1340,7 +1340,7 @@ subroutine rk_stratiform_cam_tend( &
    !REMOVECAM: this is no longer needed when CAM is retired and pcols no longer exists
    ast(:, :) = 0._r8
    !REMOVECAM_END
-   ast(:ncol, :) = cld(:ncol, :)
+   ast(:ncol, :) = cldst(:ncol, :)
 
    call t_stopf('stratiform_microphys')
 
