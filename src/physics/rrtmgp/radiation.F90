@@ -454,7 +454,9 @@ subroutine radiation_init(pbuf2d)
    ! below 1 Pa then an extra layer is added to the top of the model for
    ! the purpose of the radiation calculation.
 
-   nlay = count( pref_edge(:) > 1._r8 ) ! pascals (0.01 mbar)
+   !nlay = count( pref_edge(:) > 1._r8 ) ! pascals (0.01 mbar)
+   !++ jtb set to 10 Pa
+   nlay = count( pref_edge(:) > 10._r8 ) ! pascals (0.1 mbar)
 
    if (nlay == pverp) then
       ! Top model interface is below 1 Pa.  RRTMGP is active in all model layers plus
@@ -462,14 +464,6 @@ subroutine radiation_init(pbuf2d)
       ktopcam = 1
       ktoprad = 2
       nlaycam = pver
-   else if (nlay == (pverp-1)) then
-      ! Special case nlay == (pverp-1) -- topmost interface outside bounds (CAM MT config), treat as if it is ok.
-      ktopcam = 1
-      ktoprad = 2
-      nlaycam = pver
-      nlay = nlay+1 ! reassign the value so later code understands to treat this case like nlay==pverp
-      write(iulog,*) 'RADIATION_INIT: Special case of 1 model interface at p < 1Pa. Top layer will be INCLUDED in radiation calculation.'
-      write(iulog,*) 'RADIATION_INIT: nlay = ',nlay, ' same as pverp: ',nlay==pverp
    else
       ! nlay < pverp.  nlay layers are used in radiation calcs, and they are
       ! all CAM layers.
