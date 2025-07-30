@@ -230,14 +230,16 @@ end subroutine radheat_readnl
 ! eUV heating.
 !-----------------------------------------------------------------------
 
-    use cam_history,       only: outfld
-    use nlte_fomichev,    only: nlte_fomichev_calc
+    use cam_history,           only: outfld
+    use nlte_fomichev,         only: nlte_fomichev_calc
 
-    use physics_buffer, only : physics_buffer_desc
-    use constituents, only: cnst_get_ind
+    use physics_buffer,        only : physics_buffer_desc
+    use constituents,          only: cnst_get_ind
+    use calculate_net_heating, only: calculate_net_heating_run
+    use cam_abortutils,        only: endrun
 
 !+++arh
-    use rad_constituents, only: rad_cnst_get_gas
+    use rad_constituents,      only: rad_cnst_get_gas
 
 ! Arguments
     type(physics_state), intent(in)  :: state             ! Physics state variables
@@ -279,7 +281,9 @@ end subroutine radheat_readnl
 
 !+++arh
     integer  :: icall
-    real(r8), pointer :: gas_mmr(:,:)
+    real(r8), pointer  :: gas_mmr(:,:)
+    character(len=512) :: errmsg
+    integer            :: errflg
 
 !-----------------------------------------------------------------------
 
@@ -355,14 +359,13 @@ end subroutine radheat_readnl
     call merge_qrl (ncol, qrl, qrl_mlt, qrl_mrg)
     qout(:ncol,:) = qrl_mrg(:ncol,:)/cpair
 
-    ptend%s(:ncol,:) = qrs_mrg(:ncol,:) + qrl_mrg(:ncol,:)
-
+    ! REMOVECAM no longer need once CAM is retired and pcols doesn't exist
     net_flx = 0._r8
-    do k = 1, pver
-       do i = 1, ncol
-          net_flx(i) = net_flx(i) + ptend%s(i,k)*state%pdel(i,k)/gravit
-       end do
-    end do
+    ptend%s = 0._r8
+    ! END_REMOVECAM
+
+    call calculate_net_heating_run(ncol, pver, ptend%s(:ncol,:), qrl_mrg(:ncol,:), qrs_mrg(:ncol,:), &
+            gravit, state%pdel(:ncol,:), net_flx(:ncol), errmsg, errflg)
 
   end subroutine radheat_tend
 
