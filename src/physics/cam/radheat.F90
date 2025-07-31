@@ -230,6 +230,9 @@ end subroutine radheat_readnl
 ! eUV heating.
 !-----------------------------------------------------------------------
 
+#if ( defined OFFLINE_DYN )
+    use metdata, only: met_rlx, met_srf_feedback
+#endif
     use cam_history,           only: outfld
     use nlte_fomichev,         only: nlte_fomichev_calc
 
@@ -262,7 +265,6 @@ end subroutine radheat_readnl
     real(r8) :: qrl_mrg(pcols,pver)                 ! merged LW heating
     real(r8) :: qrl_mlt(pcols,pver)                 ! M/LT longwave heating rates
     real(r8) :: qrs_mrg(pcols,pver)                 ! merged SW heating
-    real(r8) :: qrs_mlt(pcols,pver)                 ! M/LT solar heating rates
     real(r8) :: qout(pcols,pver)                    ! temp for outfld call
     real(r8) :: dcoef(6)                            ! for tidal component of heating
     real(r8) :: tau_newt                            ! time scale for 'IR' relaxation
@@ -275,8 +277,6 @@ end subroutine radheat_readnl
     real(r8) :: xo2mmr(pcols,pver)  ! O2
     real(r8) :: xo3mmr(pcols,pver)  ! O3
     real(r8) :: xommr(pcols,pver)   ! O
-    real(r8) :: xhmmr(pcols,pver)   ! H
-    real(r8) :: xnommr(pcols,pver)  ! NO
     real(r8) :: xn2mmr(pcols,pver)  ! N2
 
 !+++arh
@@ -289,32 +289,11 @@ end subroutine radheat_readnl
 
     ncol  = state%ncol
     lchnk = state%lchnk
-    
-    call cnst_get_ind( 'CO2', ico2 )
-    xco2mmr = state%q(:,:,ico2)
-
     call physics_ptend_init(ptend, state%psetcols, 'radheat', ls=.true.)
-
-    qrs_mlt(:,:) = 0._r8
  
-! Merge cam solar heating for lower atmosphere with M/LT heating
-!    call merge_qrs (ncol, qrs, qrs_mlt, qrs_mrg, cpairv(:,:,lchnk))
-!    qout(:ncol,:) = qrs_mrg(:ncol,:)/cpair
 !++jtb
 ! just use RRTMG's
     qrs_mrg(:,:) = qrs(:,:)
-    
-!++jtb
-
-#if 0
-!  think I need to scale w/ cpair   
-    tau_newt = 1._r8 * 86400._r8 ! 1 day Newtonian timescale
-    do k = 1, pver
-       do i = 1, ncol
-          qrl_mlt(i,k) = -cpair * ( state%t(i,k) - 200._r8 ) / tau_newt
-       end do
-    end do
-#else
 
 !+++arh
    icall = 0
@@ -344,28 +323,31 @@ end subroutine radheat_readnl
    xco2mmr(:pcols,:pver) = gas_mmr(:pcols,:pver)
    nullify(gas_mmr)
 
-    !xommr   = 0._r8
-    !xo3mmr  = 0._r8
-    !xo2mmr  = 0.2320_r8
-    !xn2mmr  = 0.7547_r8
-    !xhmmr   = 0._r8
-    !xnommr  = 0._r8
-    call nlte_fomichev_calc (lchnk,ncol,state%pmid,state%pint,state%t, &
-         xo2mmr,xommr,xo3mmr,xn2mmr,xco2mmr,qrlfomichev,co2cool,o3cool,c2scool)
-    qrl_mlt = qrlfomichev
+   call nlte_fomichev_calc (lchnk,ncol,state%pmid,state%pint,state%t, &
+        xo2mmr,xommr,xo3mmr,xn2mmr,xco2mmr,qrlfomichev,co2cool,o3cool,c2scool)
+   qrl_mlt = qrlfomichev
+
+!  Merge cam long wave heating for lower atmosphere with M/LT (nlte) heating
+   call merge_qrl (ncol, qrl, qrl_mlt, qrl_mrg)
+   qout(:ncol,:) = qrl_mrg(:ncol,:)/cpair
+
+   ! REMOVECAM no longer need once CAM is retired and pcols doesn't exist
+   net_flx = 0._r8
+   ptend%s = 0._r8
+   ! END_REMOVECAM
+
+#if ( defined OFFLINE_DYN )
+   do k = 1,pver
+     if (met_rlx(k) < 1._r8 .or. met_srf_feedback) then
+       ptend%s(:ncol,k) = (qrs_mrg(:ncol,k) + qrl_mrg(:ncol,k))
+     endif
+   enddo
+   call calculate_net_heating_run(ncol, pver, ptend%s(:ncol,:), qrl_mrg(:ncol,:), qrs_mrg(:ncol,:), &
+           .true., gravit, state%pdel(:ncol,:), net_flx(:ncol), errmsg, errflg)
+#else
+   call calculate_net_heating_run(ncol, pver, ptend%s(:ncol,:), qrl_mrg(:ncol,:), qrs_mrg(:ncol,:), &
+           .false., gravit, state%pdel(:ncol,:), net_flx(:ncol), errmsg, errflg)
 #endif
-
-!   Merge cam long wave heating for lower atmosphere with M/LT (nlte) heating
-    call merge_qrl (ncol, qrl, qrl_mlt, qrl_mrg)
-    qout(:ncol,:) = qrl_mrg(:ncol,:)/cpair
-
-    ! REMOVECAM no longer need once CAM is retired and pcols doesn't exist
-    net_flx = 0._r8
-    ptend%s = 0._r8
-    ! END_REMOVECAM
-
-    call calculate_net_heating_run(ncol, pver, ptend%s(:ncol,:), qrl_mrg(:ncol,:), qrs_mrg(:ncol,:), &
-            gravit, state%pdel(:ncol,:), net_flx(:ncol), errmsg, errflg)
 
   end subroutine radheat_tend
 
@@ -374,32 +356,6 @@ end subroutine radheat_readnl
     waccm_heating_on = .false.
   end subroutine radheat_disable_waccm
 !================================================================================================
-
-  subroutine merge_qrs (ncol, hcam, hmlt, hmrg, cpair)
-!
-!  Merges short wave heating rates
-!
-    implicit none
-
-!-----------------Input arguments-----------------------------------
-    integer ncol
-
-    real(r8), intent(in)  :: hmlt(pcols,pver)                ! Upper atmosphere heating rates
-    real(r8), intent(in)  :: hcam(pcols,pver)                ! CAM heating rate
-    real(r8), intent(out) :: hmrg(pcols,pver)                ! merged heating rates
-    real(r8), intent(in)  :: cpair(pcols,pver)               ! Specific heat of dry air
-
-!-----------------Local workspace------------------------------------
-
-    integer k
-
-    do k = 1, pver
-       hmrg(:ncol,k) = qrs_wt(k)*hcam(:ncol,k) + (1._r8 - qrs_wt(k))*cpair(:ncol,k)*hmlt(:ncol,k)
-    end do
-
-  end subroutine merge_qrs
-
-!==================================================================================================
 
   subroutine merge_qrl (ncol, hcam, hmlt, hmrg)
 !
