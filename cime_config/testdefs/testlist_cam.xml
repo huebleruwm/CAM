@@ -251,6 +251,26 @@
     </options>
   </test>
 
+  <test compset="FHIST_C5" grid="f19_f19_mt232" name="ERI_D_Ln18" testmods="cam/outfrq3s_eri">
+    <machines>
+      <machine name="derecho" compiler="intel" category="aux_cam"/>
+    </machines>
+    <options>
+      <option name="wallclock">00:20:00</option>
+      <option name="comment">CAM5, branch and hybrid starts</option>
+    </options>
+  </test>
+
+  <test compset="FHIST_C5" grid="f19_f19_mt232" name="SMS_D_Ln9" testmods="cam/mam7">
+    <machines>
+      <machine name="derecho" compiler="intel" category="aux_cam"/>
+    </machines>
+    <options>
+      <option name="wallclock">00:20:00</option>
+      <option name="comment">CAM5 w/ trop_mam7</option>
+    </options>
+  </test>
+
 <!--              CAM Aquaplanet COMPSETS                 -->
 
   <test compset="QPC6" grid="f19_f19_mg17" name="ERP_D_Ln9" testmods="cam/outfrq9s">
@@ -1115,14 +1135,6 @@
     <machines>
       <machine name="derecho" compiler="intel" category="aux_cam"/>
       <machine name="derecho" compiler="intel" category="camchem"/>
-    </machines>
-    <options>
-      <option name="wallclock">00:20:00</option>
-    </options>
-  </test>
-  <test compset="QPC5M7" grid="f19_f19_mg17" name="SMS_D_Ln9" testmods="cam/outfrq9s">
-    <machines>
-      <machine name="derecho" compiler="intel" category="aux_cam"/>
     </machines>
     <options>
       <option name="wallclock">00:20:00</option>
