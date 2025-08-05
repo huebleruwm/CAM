@@ -1701,7 +1701,7 @@ CONTAINS
     cospstateIN%pfull           = state%pmid(:ncol,ktop:pver)
     cospstateIN%phalf           = state%pint(:ncol,ktop:pverp)
     cospstateIN%hgt_matrix      = zmid
-    cospstateIN%hgt_matrix_half = zint
+    cospstateIN%hgt_matrix_half = zint(1:ncol,2:nlayp) ! COSP wants half levels without model top
     cospstateIN%surfelev        = surf_hgt
     call t_stopf("construct_cospstateIN")
 
@@ -2869,7 +2869,7 @@ CONTAINS
        y%phalf(npoints,nlevels+1), &
        y%qv(npoints,nlevels), &
        y%hgt_matrix(npoints,nlevels), &
-       y%hgt_matrix_half(npoints,nlevels+1), &
+       y%hgt_matrix_half(npoints,nlevels), &
        y%land(npoints), &
        y%skt(npoints), &
        y%surfelev(nPoints), &
