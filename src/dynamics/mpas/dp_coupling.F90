@@ -106,7 +106,7 @@ subroutine d_p_coupling(phys_state, phys_tend, pbuf2d, dyn_out)
    integer :: lchnk, icol, icol_p, k, kk      ! indices over chunks, columns, physics columns and layers
    integer :: i, m, ncols
    integer :: block_index
-   integer, dimension(:), pointer :: block_offset
+   integer, dimension(:), allocatable :: block_offset
 
    real(r8), allocatable:: pmid(:,:)      !mid-level hydrostatic pressure consistent with MPAS discrete state
    real(r8), allocatable:: pintdry(:,:)   !interface hydrostatic pressure consistent with MPAS discrete state
@@ -226,6 +226,7 @@ subroutine d_p_coupling(phys_state, phys_tend, pbuf2d, dyn_out)
             frontga_phys(icol_p, k, lchnk) = frontogenesisAngle(kk, i)
          end if
       end do
+      if(allocated(block_offset)) deallocate(block_offset)
 
       do k = 1, pverp
          kk = pverp - k + 1
@@ -295,7 +296,7 @@ subroutine p_d_coupling(phys_state, phys_tend, dyn_in)
    integer :: lchnk, icol, icol_p, k, kk      ! indices over chunks, columns, layers
    integer :: i, m, ncols
    integer :: block_index
-   integer, dimension(:), pointer :: block_offset
+   integer, dimension(:), allocatable :: block_offset
 
    real(r8) :: factor
    real(r8) :: dt_phys
@@ -394,6 +395,7 @@ subroutine p_d_coupling(phys_state, phys_tend, dyn_in)
          end do
       end do
    end do
+   if(allocated(block_offset)) deallocate(block_offset)
 
    call t_stopf('pd_copy')
 

@@ -35,7 +35,8 @@ type :: Coords1D
    real(r8), allocatable :: rdst(:,:)
  contains
    procedure :: section
-   procedure :: finalize
+   procedure :: finalize            ! User-callable
+   final     :: finalize_Coords1D   ! Auto-finalize
 end type Coords1D
 
 interface Coords1D
@@ -97,12 +98,19 @@ function section(self, n_bnds, d_bnds)
 
   section = allocate_coords(n_bnds(2)-n_bnds(1)+1, d_bnds(2)-d_bnds(1)+1)
 
-  section%ifc = self%ifc(n_bnds(1):n_bnds(2),d_bnds(1):d_bnds(2)+1)
-  section%mid = self%mid(n_bnds(1):n_bnds(2),d_bnds(1):d_bnds(2))
-  section%del = self%del(n_bnds(1):n_bnds(2),d_bnds(1):d_bnds(2))
-  section%dst = self%dst(n_bnds(1):n_bnds(2),d_bnds(1):d_bnds(2)-1)
-  section%rdel = self%rdel(n_bnds(1):n_bnds(2),d_bnds(1):d_bnds(2))
-  section%rdst = self%rdst(n_bnds(1):n_bnds(2),d_bnds(1):d_bnds(2)-1)
+  ! The following code is intrepreted by nvhpc 24.9 as an allocation on assign
+  ! section%ifc  = self%ifc(n_bnds(1):n_bnds(2),d_bnds(1):d_bnds(2)+1)
+  ! section%mid  = self%mid(n_bnds(1):n_bnds(2),d_bnds(1):d_bnds(2))
+  ! section%del  = self%del(n_bnds(1):n_bnds(2),d_bnds(1):d_bnds(2))
+  ! section%dst  = self%dst(n_bnds(1):n_bnds(2),d_bnds(1):d_bnds(2)-1)
+  ! section%rdel = self%rdel(n_bnds(1):n_bnds(2),d_bnds(1):d_bnds(2))
+  ! section%rdst = self%rdst(n_bnds(1):n_bnds(2),d_bnds(1):d_bnds(2)-1)
+  section%ifc(:,:)  = self%ifc(n_bnds(1):n_bnds(2),d_bnds(1):d_bnds(2)+1)
+  section%mid(:,:)  = self%mid(n_bnds(1):n_bnds(2),d_bnds(1):d_bnds(2))
+  section%del(:,:)  = self%del(n_bnds(1):n_bnds(2),d_bnds(1):d_bnds(2))
+  section%dst(:,:)  = self%dst(n_bnds(1):n_bnds(2),d_bnds(1):d_bnds(2)-1)
+  section%rdel(:,:) = self%rdel(n_bnds(1):n_bnds(2),d_bnds(1):d_bnds(2))
+  section%rdst(:,:) = self%rdst(n_bnds(1):n_bnds(2),d_bnds(1):d_bnds(2)-1)
 
 end function section
 
@@ -123,29 +131,24 @@ function allocate_coords(n, d) result(coords)
 
 end function allocate_coords
 
-! Deallocate and reset to initial state.
-subroutine finalize(self)
-  class(Coords1D), intent(inout) :: self
-
-  self%n = 0
-  self%d = 0
-
-  call guarded_deallocate(self%ifc)
-  call guarded_deallocate(self%mid)
-  call guarded_deallocate(self%del)
-  call guarded_deallocate(self%dst)
-  call guarded_deallocate(self%rdel)
-  call guarded_deallocate(self%rdst)
-
-contains
-
-  subroutine guarded_deallocate(array)
-    real(r8), allocatable :: array(:,:)
-
-    if (allocated(array)) deallocate(array)
-
-  end subroutine guarded_deallocate
-
+subroutine finalize(this)
+  class(Coords1D), intent(inout) :: this
+  call finalize_Coords1D(this)
 end subroutine finalize
+
+! Deallocate and reset to initial state.
+subroutine finalize_Coords1D(this)
+  type(Coords1D) :: this
+
+  this%n = 0
+  this%d = 0
+  if(allocated(this%ifc))  deallocate(this%ifc)
+  if(allocated(this%mid))  deallocate(this%mid)
+  if(allocated(this%del))  deallocate(this%del)
+  if(allocated(this%dst))  deallocate(this%dst)
+  if(allocated(this%rdel)) deallocate(this%rdel)
+  if(allocated(this%rdst)) deallocate(this%rdst)
+
+end subroutine finalize_Coords1D
 
 end module coords_1d

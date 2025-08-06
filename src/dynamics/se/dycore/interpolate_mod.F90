@@ -24,10 +24,13 @@ module interpolate_mod
   logical   :: debug=.false.
 
   type, public :: interpolate_t
-     real (kind=r8), dimension(:,:), pointer :: Imat  ! P_k(xj)*wj/gamma(k)
-     real (kind=r8), dimension(:)  , pointer :: rk    ! 1/k
-     real (kind=r8), dimension(:)  , pointer :: vtemp ! temp results
-     real (kind=r8), dimension(:)  , pointer :: glp   ! GLL pts (nair)
+     real (kind=r8), dimension(:,:), allocatable :: Imat  ! P_k(xj)*wj/gamma(k)
+     real (kind=r8), dimension(:)  , allocatable :: rk    ! 1/k
+     real (kind=r8), dimension(:)  , allocatable :: vtemp ! temp results
+     real (kind=r8), dimension(:)  , allocatable :: glp   ! GLL pts (nair)
+  contains 
+     procedure :: finalize => finalize_interpolate_t
+     final     :: finalize_interpolate_t_core
   end type interpolate_t
 
   type, public :: interpdata_t
@@ -40,7 +43,11 @@ module interpolate_mod
      integer                                  :: nlat
      integer                                  :: nlon
      logical                                  :: first_entry = .TRUE.
+  contains
+     procedure :: finalize => finalize_interpdata_t
+     final     :: finalize_interpdata_t_core
   end type interpdata_t
+
 
   real (kind=r8), private :: delta  = 1.0e-9_r8  ! move tiny bit off center to
   ! avoid landing on element edges
@@ -74,6 +81,7 @@ module interpolate_mod
   public :: interpolate_create
   public :: point_inside_quad
   public :: vec_latlon_to_contra
+
 
 
   interface interpolate_scalar
@@ -114,6 +122,34 @@ module interpolate_mod
 !JMD  public :: bilin_phys2gll_init
 contains
 
+  !
+  ! Destructors for interpdata_t
+  !
+  subroutine finalize_interpdata_t(this)
+     class(interpdata_t), intent(inout) :: this
+     call finalize_interpdata_t_core(this)
+  end subroutine finalize_interpdata_t
+  subroutine finalize_interpdata_t_core(this)
+     type (interpdata_t) :: this
+     if(associated(this%interp_xy)) deallocate(this%interp_xy)
+     if(associated(this%ilat))      deallocate(this%ilat)
+     if(associated(this%ilon))      deallocate(this%ilon)
+  end subroutine finalize_interpdata_t_core
+
+  !
+  ! Destructors for interpolate_t
+  !
+  subroutine finalize_interpolate_t(this)
+     class(interpolate_t), intent(inout) :: this
+     call finalize_interpolate_t_core(this)
+  end subroutine finalize_interpolate_t
+  subroutine finalize_interpolate_t_core(this)
+     type (interpolate_t) :: this
+     if(allocated(this%Imat))  deallocate(this%Imat)
+     if(allocated(this%rk))    deallocate(this%rk)
+     if(allocated(this%vtemp)) deallocate(this%vtemp)
+     if(allocated(this%glp))   deallocate(this%glp)
+  end subroutine finalize_interpolate_t_core
 
   subroutine set_interp_parameter(parm_name, value)
     character*(*), intent(in) :: parm_name
@@ -266,8 +302,7 @@ contains
       interp_gll(:) = gll%points(:)
       interp_tracers_init = .true.
 
-      deallocate(gll%points)
-      deallocate(gll%weights)
+      call gll%finalize()
 
 
   end subroutine interpolate_tracers_init
