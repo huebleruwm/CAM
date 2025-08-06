@@ -382,6 +382,15 @@ subroutine radiation_init(pbuf2d)
    integer :: history_budget_histfile_num ! output history file number for budget fields
    integer :: err
 
+   ! Cloud optics variables
+   integer :: nmu, n_g_d, nlambda
+   real(kind=r8), allocatable :: abs_lw_ice(:,:)
+   real(kind=r8), allocatable :: abs_lw_liq(:,:,:)
+   real(kind=r8), allocatable :: g_lambda(:,:)
+   real(kind=r8), allocatable :: g_mu(:)
+   real(kind=r8), allocatable :: g_d_eff(:)
+   real(kind=r8) :: tiny
+
    integer :: dtime
    !-----------------------------------------------------------------------
 
@@ -390,7 +399,8 @@ subroutine radiation_init(pbuf2d)
    call rad_data_init(pbuf2d) ! initialize output fields for offline driver
    call radsw_init()
    call radlw_init()
-   call cloud_rad_props_init()
+   call cloud_rad_props_init(nmu, nlambda, n_g_d, abs_lw_liq, abs_lw_ice, &
+                             g_mu, g_lambda, g_d_eff, tiny)
 
    cld_idx      = pbuf_get_index('CLD')
    cldfsnow_idx = pbuf_get_index('CLDFSNOW',errcode=err)
@@ -741,7 +751,7 @@ subroutine radiation_tend( &
                                  num_rrtmg_levs
 
    use interpolate_data,   only: vertinterp
-   use tropopause,         only: tropopause_find, TROP_ALG_HYBSTOB, TROP_ALG_CLIMATE
+   use tropopause,         only: tropopause_find_cam, TROP_ALG_HYBSTOB, TROP_ALG_CLIMATE
 
    use cospsimulator_intr, only: docosp, cospsimulator_intr_run, cosp_nradsteps
 
@@ -958,7 +968,11 @@ subroutine radiation_tend( &
 
    ! Find tropopause height if needed for diagnostic output
    if (hist_fld_active('FSNR') .or. hist_fld_active('FLNR')) then
-      call tropopause_find(state, troplev, tropP=p_trop, primary=TROP_ALG_HYBSTOB, backup=TROP_ALG_CLIMATE)
+      !REMOVECAM - no longer need this when CAM is retired and pcols no longer exists
+      troplev(:) = 0
+      p_trop(:) = 0._r8
+      !REMOVECAM_END
+      call tropopause_find_cam(state, troplev, tropP=p_trop, primary=TROP_ALG_HYBSTOB, backup=TROP_ALG_CLIMATE)
    endif
 
    ! Get time of next radiation calculation - albedos will need to be

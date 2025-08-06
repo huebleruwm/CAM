@@ -17,7 +17,7 @@ module control_mod
   integer, public  :: ftype = 2                               ! Forcing Type
   integer, public  :: ftype_conserve = 1  !conserve momentum (dp*u)
   integer, public  :: dribble_in_rsplit_loop = 0
-  integer, public  :: statediag_numtrac = 3          
+  integer, public  :: statediag_numtrac = 3
 
   integer, public :: qsplit = 1           ! ratio of dynamics tsteps to tracer tsteps
   integer, public :: rsplit =-1           ! for vertically lagrangian dynamics, apply remap
@@ -121,11 +121,13 @@ module control_mod
 
   !
   ! molecular diffusion
-  !  
+  !
   real(r8), public :: molecular_diff = -1.0_r8
 
   integer, public  :: vert_remap_uvTq_alg, vert_remap_tracer_alg
 
-
   integer, public :: pgf_formulation = -1 !PGF formulation - see prim_advance_mod.F90
+
+  real(r8), public :: min_temperature = 0._r8
+
 end module control_mod

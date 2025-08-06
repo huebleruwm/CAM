@@ -10,7 +10,7 @@ use constituents,           only: pcnst, cnst_get_ind, cnst_name, cnst_longname,
                                   cnst_is_a_water_species
 use cam_control_mod,        only: initial_run
 use cam_initfiles,          only: initial_file_get_id, topo_file_get_id, pertlim
-use phys_control,           only: use_gw_front, use_gw_front_igw
+use phys_control,           only: use_gw_front, use_gw_front_igw, use_gw_movmtn_pbl
 use dyn_grid,               only: ini_grid_name, timelevel, hvcoord, edgebuf, &
                                   ini_grid_hdim_name
 
@@ -79,6 +79,7 @@ logical, public, protected :: write_restart_unstruct
 ! Frontogenesis indices
 integer, public    :: frontgf_idx      = -1
 integer, public    :: frontga_idx      = -1
+integer, public    :: vort4gw_idx      = -1
 
 interface read_dyn_var
   module procedure read_dyn_field_2d
@@ -115,6 +116,7 @@ subroutine dyn_readnl(NLFileName)
    use control_mod,    only: max_hypervis_courant, statediag_numtrac,refined_mesh
    use control_mod,    only: molecular_diff, pgf_formulation, dribble_in_rsplit_loop
    use control_mod,    only: sponge_del4_nu_div_fac, sponge_del4_nu_fac, sponge_del4_lev
+   use control_mod,    only: min_temperature
    use dimensions_mod, only: ne, npart
    use dimensions_mod, only: large_Courant_incr
    use dimensions_mod, only: fvm_supercycling, fvm_supercycling_jet
@@ -172,6 +174,8 @@ subroutine dyn_readnl(NLFileName)
    real(r8)                     :: se_molecular_diff
    integer                      :: se_pgf_formulation
    integer                      :: se_dribble_in_rsplit_loop
+   real(r8)                     :: se_min_temperature = 0.0_r8
+
    namelist /dyn_se_inparm/        &
       se_fine_ne,                  & ! For refined meshes
       se_ftype,                    & ! forcing type
@@ -217,7 +221,8 @@ subroutine dyn_readnl(NLFileName)
       se_kmax_jet,                 &
       se_molecular_diff,           &
       se_pgf_formulation,          &
-      se_dribble_in_rsplit_loop
+      se_dribble_in_rsplit_loop,   &
+      se_min_temperature
    !--------------------------------------------------------------------------
 
    ! defaults for variables not set by build-namelist
@@ -292,6 +297,8 @@ subroutine dyn_readnl(NLFileName)
    call MPI_bcast(se_molecular_diff, 1, mpi_real8, masterprocid, mpicom, ierr)
    call MPI_bcast(se_pgf_formulation, 1, mpi_integer, masterprocid, mpicom, ierr)
    call MPI_bcast(se_dribble_in_rsplit_loop, 1, mpi_integer, masterprocid, mpicom, ierr)
+   call MPI_bcast(se_min_temperature, 1, mpi_real8, masterprocid, mpicom, ierr)
+
    if (se_npes <= 0) then
       call endrun('dyn_readnl: ERROR: se_npes must be > 0')
    end if
@@ -360,6 +367,8 @@ subroutine dyn_readnl(NLFileName)
    molecular_diff           = se_molecular_diff
    pgf_formulation          = se_pgf_formulation
    dribble_in_rsplit_loop   = se_dribble_in_rsplit_loop
+   min_temperature          = se_min_temperature
+
    if (fv_nphys > 0) then
       ! Use finite volume physics grid and CSLAM for tracer advection
       nphys_pts = fv_nphys*fv_nphys
@@ -495,6 +504,11 @@ subroutine dyn_readnl(NLFileName)
                             se_write_restart_unstruct
 
       write(iulog, '(a,e9.2)') 'dyn_readnl: se_molecular_diff  = ', molecular_diff
+
+      if (min_temperature>0._r8) then
+         write(iulog, '(a,e9.2)') 'dyn_readnl: se_min_temperature  = ', min_temperature
+      end if
+
    end if
 
    call native_mapping_readnl(NLFileName)
@@ -571,6 +585,10 @@ subroutine dyn_register()
          frontgf_idx)
       call pbuf_add_field("FRONTGA", "global", dtype_r8, (/pcols,pver/),       &
          frontga_idx)
+   end if
+   if (use_gw_movmtn_pbl) then
+      call pbuf_add_field("VORT4GW", "global", dtype_r8, (/pcols,pver/),       &
+         vort4gw_idx)
    end if
 
 end subroutine dyn_register
@@ -875,8 +893,7 @@ subroutine dyn_init(dyn_in, dyn_out)
       call get_loop_ranges(hybrid, ibeg=nets, iend=nete)
       call prim_init2(elem, fvm, hybrid, nets, nete, TimeLevel, hvcoord)
       !$OMP END PARALLEL
-
-      if (use_gw_front .or. use_gw_front_igw) call gws_init(elem)
+      if (use_gw_front .or. use_gw_front_igw .or. use_gw_movmtn_pbl) call gws_init(elem)
    end if  ! iam < par%nprocs
 
    call addfld ('nu_kmvis',   (/ 'lev' /), 'A', '', 'Molecular viscosity Laplacian coefficient'            , gridname='GLL')
@@ -1993,7 +2010,7 @@ subroutine set_phis(dyn_in)
                               PHIS_OUT=phis_tmp, mask=pmask(:))
       deallocate(glob_ind)
 
-   end if
+    end if
 
    deallocate(pmask)
 
