@@ -351,10 +351,15 @@
       <option name="wallclock">00:10:00</option>
     </options>
   </test>
-  <test compset="QPC5" grid="ne5_ne5_mg37" name="ERP_Ln9" testmods="cam/outfrq9s" supported="false">
+
+  <test compset="QPC5" grid="ne3pg3_ne3pg3_mt232" name="ERC_D_Ln9" testmods="cam/outfrq9s" supported="false">
     <machines>
       <machine name="izumi" compiler="gnu" category="aux_cam"/>
     </machines>
+    <options>
+      <option name="wallclock">00:10:00</option>
+      <option name="comment" >CAM5 aquaplanet</option>
+    </options>
   </test>
 
   <test compset="QSC6" grid="f19_f19_mg17" name="ERP_D_Ln9" testmods="cam/outfrq9s">
@@ -497,13 +502,13 @@
       <option name="wallclock">00:30:00</option>
     </options>
   </test>
-<!--              320 tsm ter tbl                        -->
-  <test compset="QPC5" grid="f10_f10_mg37" name="ERC_D_Ln9" testmods="cam/rad_diag">
+
+  <test compset="FHIST_C5" grid="f10_f10_mg37" name="ERC_D_Ln9" testmods="cam/rad_diag">
     <machines>
       <machine name="izumi" compiler="gnu" category="aux_cam"/>
     </machines>
     <options>
-      <option name="comment" >320 tsm ter</option>
+      <option name="comment" >CAM5, no chem, rad_diag w/ prescribed bulk aerosols</option>
       <option name="wallclock">00:30:00</option>
     </options>
   </test>
@@ -1049,36 +1054,6 @@
     </options>
   </test>
 
-<!--              711    ter                    -->
-  <test compset="QPC5" grid="ne5_ne5_mg37" name="ERC_D_Ln9" testmods="cam/outfrq3s_ttrac">
-    <machines>
-      <machine name="izumi" compiler="nag" category="aux_cam"/>
-    </machines>
-    <options>
-      <option name="comment" >711 tsm, ter</option>
-      <option name="wallclock">00:30:00</option>
-    </options>
-  </test>
-<!--              714  sms                      -->
-  <test compset="QPC5" grid="ne5pg3_ne5pg3_mg37" name="SMS_D_Ln9" testmods="cam/outfrq3s_ttrac">
-    <machines>
-      <machine name="izumi" compiler="gnu" category="aux_cam"/>
-    </machines>
-    <options>
-      <option name="comment" >714 tsm, ter</option>
-      <option name="wallclock">00:30:00</option>
-    </options>
-  </test>
-<!--              712                        -->
-  <test compset="QPC5" grid="ne5_ne5_mg37" name="ERC_D_Ln9" testmods="cam/outfrq3s_ba">
-    <machines>
-      <machine name="izumi" compiler="gnu" category="aux_cam"/>
-    </machines>
-    <options>
-      <option name="comment" >712 tsm, ter</option>
-      <option name="wallclock">00:30:00</option>
-    </options>
-  </test>
 <!--              720                        -->
   <test compset="QPC4" grid="ne16_ne16_mg17" name="ERC_D_Ln9" testmods="cam/outfrq3s_usecase">
     <machines>

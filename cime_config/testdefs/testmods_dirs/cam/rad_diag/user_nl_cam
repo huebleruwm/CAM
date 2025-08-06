@@ -1,6 +1,6 @@
 mfilt=1,1,1,1,1,1
 ndens=1,1,1,1,1,1
-nhtfrq=3,3,3,3,3,3
+nhtfrq=9,9,9,9,9,9
 inithist='ENDOFRUN'
 rad_diag_1='A:Q:H2O','N:O2:O2','N:CO2:CO2','N:ozone:O3','N:N2O:N2O','N:CH4:CH4', 'N:CFC11:CFC11','N:CFC12:CFC12', 'N:sulf:$DIN_LOC_ROOT/atm/cam/physprops/sulfate_rrtmg_c080918.nc'
 
