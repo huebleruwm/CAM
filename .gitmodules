@@ -211,3 +211,6 @@ fxtag = v0.2.1
 fxrequired = ToplevelRequired
 fxDONOTUSEurl = https://github.com/NCAR/CUPiD.git
 
+[submodule "src/utils/cam-sima"]
+	path = src/utils/cam-sima
+	url = https://github.com/ESCOMP/CAM-SIMA.git
