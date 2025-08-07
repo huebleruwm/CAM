@@ -40,6 +40,14 @@
         fxrequired = AlwaysRequired
 	fxDONOTUSEurl = https://github.com/ESCOMP/atmospheric_physics
 
+[submodule "cam-sima"]
+        path = src/utils/cam-sima
+        url = https://github.com/ESCOMP/CAM-SIMA.git
+        fxrequired = AlwaysRequired
+        fxsparse = ../.sima_phys_utils_sparse_checkout
+        fxtag = sima0_07_000
+        fxDONOTUSEurl = https://github.com/ESCOMP/CAM-SIMA.git
+
 [submodule "fv3"]
 	path = src/dynamics/fv3
 	url = https://github.com/ESCOMP/CAM_FV3_interface.git
@@ -210,7 +218,3 @@ url = https://github.com/NCAR/CUPiD.git
 fxtag = v0.2.1
 fxrequired = ToplevelRequired
 fxDONOTUSEurl = https://github.com/NCAR/CUPiD.git
-
-[submodule "src/utils/cam-sima"]
-	path = src/utils/cam-sima
-	url = https://github.com/ESCOMP/CAM-SIMA.git
