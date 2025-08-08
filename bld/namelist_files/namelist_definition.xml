@@ -5771,6 +5771,13 @@ Calculate radiative effect of graupel/hail (using snow optics)
 Default: FALSE
 </entry>
 
+<entry id="p_top_for_rrtmgp" type="real"  category="radiation"
+       group="radiation_nl" valid_values="" >
+Top pressure level for RRTMGP
+Default: 1.0 for WACCM/WACCMX
+         10. for all other CAM runs
+</entry>
+
 <entry id="use_rad_dt_cosz" type="logical"  category="radiation"
        group="radiation_nl" valid_values="" >
 If true, then average the zenith angle over the radiation timestep rather
