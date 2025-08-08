@@ -9,11 +9,6 @@ carma_do_fixedinit=.false.
 fexcl1='CFAD_DBZE94_CS','CLDTOT_CALCS','CLD_CAL_NOTCS','CS_MIXCERT','CS_MIXPOSS','CS_NOPRECIP','CS_PIA',
        'CS_RAINPOSS','CS_RAINPROB','CS_RAINCERT','CS_RAINHARD','CS_SNOWCERT','CS_SNOWPOSS'
 
-microp_uniform=.false.
-use_subcol_microp=.true.
-subcol_scheme='tstcp'
-subcol_tstcp_noAvg=.true.
-
 mode_defs=
 'mam3_mode1:accum:=', 'A:num_a1:N:num_c1:num_mr:+',
  'A:so4_a1:N:so4_c1:sulfate:$DIN_LOC_ROOT/atm/cam/physprops/sulfate_rrtmg_c080918.nc:+',
