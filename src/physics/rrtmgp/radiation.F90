@@ -132,7 +132,7 @@ type rad_out_t
    real(r8) :: grau_icld_vistau(pcols,pver) ! Graupel in-cloud visible sw optical depth for output on history files
 end type rad_out_t
 
-! Control variables set via namelist
+! Control variables set via nmamelist
 character(len=cl) :: coefs_lw_file ! filepath for lw coefficients
 character(len=cl) :: coefs_sw_file ! filepath for sw coefficients
 
