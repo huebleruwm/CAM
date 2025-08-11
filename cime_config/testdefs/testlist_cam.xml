@@ -291,6 +291,16 @@
     </options>
   </test>
 
+  <test compset="FHIST_C5" grid="f10_f10_mt232" name="TMC_D_Ln9" testmods="cam/mc_ttrac">
+    <machines>
+      <machine name="izumi" compiler="nag" category="aux_cam"/>
+    </machines>
+    <options>
+      <option name="comment" >CAM5, check mass conservation of test tracer TT_UN</option>
+      <option name="wallclock">00:30:00</option>
+    </options>
+  </test>
+
 <!--              CAM Aquaplanet COMPSETS                 -->
 
   <test compset="QPC6" grid="f19_f19_mg17" name="ERP_D_Ln9" testmods="cam/outfrq9s">
@@ -450,17 +460,6 @@
     </machines>
     <options>
       <option name="wallclock">00:10:00</option>
-    </options>
-  </test>
-
-<!--              311 tmc                        -->
-  <test compset="QPC5" grid="f10_f10_mg37" name="TMC_D" testmods="cam/outfrq3s_eoyttrac">
-    <machines>
-      <machine name="izumi" compiler="nag" category="aux_cam"/>
-    </machines>
-    <options>
-      <option name="comment" >311 tmc</option>
-      <option name="wallclock">00:30:00</option>
     </options>
   </test>
 
