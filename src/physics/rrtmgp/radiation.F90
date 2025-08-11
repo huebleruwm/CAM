@@ -132,7 +132,7 @@ type rad_out_t
    real(r8) :: grau_icld_vistau(pcols,pver) ! Graupel in-cloud visible sw optical depth for output on history files
 end type rad_out_t
 
-! Control variables set via nmamelist
+! Control variables set via namelist
 character(len=cl) :: coefs_lw_file ! filepath for lw coefficients
 character(len=cl) :: coefs_sw_file ! filepath for sw coefficients
 
@@ -282,9 +282,8 @@ subroutine radiation_readnl(nlfile)
       open( newunit=unitn, file=trim(nlfile), status='old' )
       call find_group_name(unitn, 'radiation_nl', status=ierr)
       if (ierr == 0) then
-         read(unitn, radiation_nl, iostat=ierr)
+         read(unitn, radiation_nl, iostat=ierr, iomsg=errmsg)
          if (ierr /= 0) then
-            write(errmsg,'(a,i5)') 'iostat =', ierr
             call endrun(sub//': ERROR reading namelist: '//trim(errmsg))
          end if
       end if

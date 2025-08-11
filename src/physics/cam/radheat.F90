@@ -248,7 +248,7 @@ end subroutine radheat_readnl
     type(physics_state), intent(in)  :: state             ! Physics state variables
 
     type(physics_buffer_desc), pointer :: pbuf(:)
-    type(physics_ptend), intent(out) :: ptend             ! indivdual parameterization tendencie
+    type(physics_ptend), intent(out) :: ptend             ! individual parameterization tendencies
     real(r8),            intent(in)  :: qrl(pcols,pver)   ! longwave heating
     real(r8),            intent(in)  :: qrs(pcols,pver)   ! shortwave heating
     real(r8),            intent(in)  :: fsns(pcols)       ! Surface solar absorbed flux
@@ -291,11 +291,9 @@ end subroutine radheat_readnl
     lchnk = state%lchnk
     call physics_ptend_init(ptend, state%psetcols, 'radheat', ls=.true.)
  
-!++jtb
-! just use RRTMG's
+! Shortwave heating is RRTMG solar heating only
     qrs_mrg(:,:) = qrs(:,:)
 
-!+++arh
    icall = 0
 
 ! can't find gas name 'O'
@@ -312,12 +310,8 @@ end subroutine radheat_readnl
    xo3mmr(:pcols,:pver) = gas_mmr(:pcols,:pver)
    nullify(gas_mmr)
 
-! can't find gas name 'N2'
-   !call rad_cnst_get_gas(icall,'N2   ', state, pbuf, gas_mmr)
-   !xn2mmr(:pcols,:pver) = gas_mmr(:pcols,:pver)
-   !nullify(gas_mmr)
-   !++ jtb set to 0.7547 ('standard' mass mixing ratio of nitrogen gas in atmos)
-   xn2mmr(:pcols,:pver) =  0.7547_r8 !0._r8
+! Using standard US N2_VMR(0.78084) converted to N2_MMR=N2_VMR*(N2_mass/dry_air_mass)
+   xn2mmr(:pcols,:pver) =  0.7553_r8 ! N2_MMR
 
    call rad_cnst_get_gas(icall,'CO2  ', state, pbuf, gas_mmr)
    xco2mmr(:pcols,:pver) = gas_mmr(:pcols,:pver)
