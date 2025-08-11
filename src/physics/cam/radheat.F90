@@ -337,11 +337,11 @@ end subroutine radheat_readnl
      endif
    enddo
    call calculate_net_heating_run(ncol, ptend%s(:ncol,:), qrl_mrg(:ncol,:), qrs_mrg(:ncol,:), .true., &
-           gravit, state%pdel(:ncol,:), fsns(:ncol), fsnt(:ncol), flns(:ncol), flnt(:ncol), net_flx(:ncol), &
+           fsns(:ncol), fsnt(:ncol), flns(:ncol), flnt(:ncol), net_flx(:ncol), &
            errmsg, errflg)
 #else
    call calculate_net_heating_run(ncol, ptend%s(:ncol,:), qrl_mrg(:ncol,:), qrs_mrg(:ncol,:), .false., &
-           gravit, state%pdel(:ncol,:), fsns(:ncol), fsnt(:ncol), flns(:ncol), flnt(:ncol), net_flx(:ncol), &
+           fsns(:ncol), fsnt(:ncol), flns(:ncol), flnt(:ncol), net_flx(:ncol), &
            errmsg, errflg)
 #endif
 
