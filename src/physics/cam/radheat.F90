@@ -20,7 +20,7 @@ module radheat
   use spmd_utils,      only: masterproc
   use ppgrid,          only: pcols, pver
   use physics_types,   only: physics_state, physics_ptend, physics_ptend_init
-  use physconst,       only: gravit,cpair,mwco2
+  use physconst,       only: cpair,mwco2
   use air_composition, only: cpairv
   use perf_mod
   use cam_logfile,     only: iulog
@@ -88,9 +88,7 @@ end subroutine radheat_readnl
 
     
     use nlte_fomichev,    only: nlte_fomichev_init
-    use cam_history,      only: add_default, addfld
     use phys_control,     only: phys_getopts
-    use physics_buffer,   only : physics_buffer_desc
 
     ! args
 
@@ -187,7 +185,7 @@ end subroutine radheat_readnl
     call nlte_fomichev_init (co2_mw, n2_mw, o1_mw, o2_mw, o3_mw, no_mw, nlte_limit_co2)
     
 
-    ! determine upppermost level that is purely solar heating (no MLT chem heationg)
+    ! determine upppermost level that is purely solar heating (no MLT chem heating)
     ntop_qrs_cam = 0
     do k=pver,1,-1
        if (qrs_wt(k)==1._r8) ntop_qrs_cam = k
@@ -241,7 +239,6 @@ end subroutine radheat_readnl
     use calculate_net_heating, only: calculate_net_heating_run
     use cam_abortutils,        only: endrun
 
-!+++arh
     use rad_constituents,      only: rad_cnst_get_gas
 
 ! Arguments
@@ -259,15 +256,12 @@ end subroutine radheat_readnl
     real(r8),            intent(out) :: net_flx(pcols)
 
 ! Local variables
-    integer  :: i, k , ico2
+    integer  :: k 
     integer  :: ncol                                ! number of atmospheric columns
     integer  :: lchnk                               ! chunk identifier
     real(r8) :: qrl_mrg(pcols,pver)                 ! merged LW heating
     real(r8) :: qrl_mlt(pcols,pver)                 ! M/LT longwave heating rates
     real(r8) :: qrs_mrg(pcols,pver)                 ! merged SW heating
-    real(r8) :: qout(pcols,pver)                    ! temp for outfld call
-    real(r8) :: dcoef(6)                            ! for tidal component of heating
-    real(r8) :: tau_newt                            ! time scale for 'IR' relaxation
 
     real(r8) :: qrlfomichev(pcols,pver) ! Fomichev cooling rate ! (K/s)
     real(r8) :: o3cool(pcols,pver) ! Fomichev cooling rate ! (K/s)
@@ -279,7 +273,6 @@ end subroutine radheat_readnl
     real(r8) :: xommr(pcols,pver)   ! O
     real(r8) :: xn2mmr(pcols,pver)  ! N2
 
-!+++arh
     integer  :: icall
     real(r8), pointer  :: gas_mmr(:,:)
     character(len=512) :: errmsg
@@ -323,7 +316,6 @@ end subroutine radheat_readnl
 
 !  Merge cam long wave heating for lower atmosphere with M/LT (nlte) heating
    call merge_qrl (ncol, qrl, qrl_mlt, qrl_mrg)
-   qout(:ncol,:) = qrl_mrg(:ncol,:)/cpair
 
    ! REMOVECAM no longer need once CAM is retired and pcols doesn't exist
    net_flx = 0._r8
