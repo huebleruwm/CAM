@@ -37,8 +37,6 @@ module radheat
        radheat_timestep_init, &!
        radheat_tend            ! return net radiative heating
 
-  public :: radheat_disable_waccm ! disable waccm heating in the upper atm
-
 
 ! Private variables for merging heating rates
   real(r8):: qrs_wt(pver)             ! merge weight for cam solar heating
@@ -188,14 +186,6 @@ end subroutine radheat_readnl
        if (qrs_wt(k)==1._r8) ntop_qrs_cam = k
     enddo
 
-
-    ! WACCM heating if top-most layer is above merge region
-    waccm_heating = (pref_mid(1) .le. min_pressure_sw)
-
-    if (masterproc) then
-       write(iulog,*) 'WACCM Heating is computed (true/false): ',waccm_heating
-    end if
-
   end subroutine radheat_init
 
 !================================================================================================
@@ -337,11 +327,6 @@ end subroutine radheat_readnl
   end subroutine radheat_tend
 
 !================================================================================================
-  subroutine radheat_disable_waccm()
-    waccm_heating_on = .false.
-  end subroutine radheat_disable_waccm
-!================================================================================================
-
   subroutine merge_qrl (ncol, hcam, hmlt, hmrg)
 !
 !  Merges long wave heating rates
