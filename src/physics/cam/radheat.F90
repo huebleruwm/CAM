@@ -37,6 +37,7 @@ module radheat
        radheat_timestep_init, &!
        radheat_tend            ! return net radiative heating
 
+  public :: radheat_disable_waccm ! disable waccm heating in the upper atm
 
 ! Private variables for merging heating rates
   real(r8):: qrs_wt(pver)             ! merge weight for cam solar heating
@@ -134,7 +135,7 @@ end subroutine radheat_readnl
 
     do k=1,pver
 
-       ! pressure scale heights for camrt merging (waccm4)
+       ! pressure scale heights for camrt merging (cam4)
        psh(k)=log(1e5_r8/pref_mid(k))
 
        if ( pref_mid(k) .le. min_pressure_sw  ) then
@@ -290,8 +291,8 @@ end subroutine radheat_readnl
    xo3mmr(:pcols,:pver) = gas_mmr(:pcols,:pver)
    nullify(gas_mmr)
 
-! Using standard US N2_VMR(0.78084) converted to N2_MMR=N2_VMR*(N2_mass/dry_air_mass)
-   xn2mmr(:pcols,:pver) =  N2_VMR * (N2_mass / dry_air_mass)
+! Using standard US N2_VMR(0.78084) converted to N2_MMR
+   xn2mmr(:pcols,:pver) =  N2_VMR * (N2_mass / mass_dry_air)
 
    call rad_cnst_get_gas(icall,'CO2  ', state, pbuf, gas_mmr)
    xco2mmr(:pcols,:pver) = gas_mmr(:pcols,:pver)
@@ -327,6 +328,9 @@ end subroutine radheat_readnl
   end subroutine radheat_tend
 
 !================================================================================================
+  subroutine radheat_disable_waccm()
+  end subroutine radheat_disable_waccm
+
   subroutine merge_qrl (ncol, hcam, hmlt, hmrg)
 !
 !  Merges long wave heating rates
