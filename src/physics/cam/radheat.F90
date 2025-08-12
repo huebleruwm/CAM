@@ -44,9 +44,6 @@ module radheat
   real(r8):: qrs_wt(pver)             ! merge weight for cam solar heating
   real(r8):: qrl_wt(pver)             ! merge weight for cam long wave heating
 
-  logical :: waccm_heating
-  logical :: waccm_heating_on = .true.
-
   ! sw merge region
   ! highest altitude (lowest  pressure) of merge region (Pa)
   real(r8) :: min_pressure_sw= 5._r8
@@ -273,6 +270,10 @@ end subroutine radheat_readnl
     real(r8) :: xommr(pcols,pver)   ! O
     real(r8) :: xn2mmr(pcols,pver)  ! N2
 
+    real(r8), parameter :: N2_VMR       = 0.78084 ! From US standard atmosphere
+    real(r8), parameter :: N2_mass      = 28.0134 ! g/mol
+    real(r8), parameter :: mass_dry_air = 28.9647 ! g/mol
+
     integer  :: icall
     real(r8), pointer  :: gas_mmr(:,:)
     character(len=512) :: errmsg
@@ -289,10 +290,6 @@ end subroutine radheat_readnl
 
    icall = 0
 
-! can't find gas name 'O'
-   !call rad_cnst_get_gas(icall,'O    ', state, pbuf, gas_mmr)
-   !xommr(:pcols,:pver) = gas_mmr(:pcols,:pver)
-   !nullify(gas_mmr)
    xommr(:pcols,:pver) = 0._r8
 
    call rad_cnst_get_gas(icall,'O2   ', state, pbuf, gas_mmr)
@@ -304,7 +301,7 @@ end subroutine radheat_readnl
    nullify(gas_mmr)
 
 ! Using standard US N2_VMR(0.78084) converted to N2_MMR=N2_VMR*(N2_mass/dry_air_mass)
-   xn2mmr(:pcols,:pver) =  0.7553_r8 ! N2_MMR
+   xn2mmr(:pcols,:pver) =  N2_VMR * (N2_mass / dry_air_mass)
 
    call rad_cnst_get_gas(icall,'CO2  ', state, pbuf, gas_mmr)
    xco2mmr(:pcols,:pver) = gas_mmr(:pcols,:pver)
