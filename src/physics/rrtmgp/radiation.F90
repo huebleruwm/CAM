@@ -148,6 +148,8 @@ logical :: spectralflux     = .false. ! calculate fluxes (up and down) per band.
 logical :: graupel_in_rad   = .false. ! graupel in radiation code
 logical :: use_rad_uniform_angle = .false. ! if true, use the namelist rad_uniform_angle for the coszrs calculation
 
+real(r8) :: p_top_for_rrtmgp = 0._r8 ! top pressure for RRTMGP
+
 ! Gathered indices of day and night columns 
 integer :: nday           ! Number of daylight columns
 integer :: nnite          ! Number of night columns
@@ -285,16 +287,15 @@ subroutine radiation_readnl(nlfile)
    namelist /radiation_nl/ &
       rrtmgp_coefs_lw_file, rrtmgp_coefs_sw_file, iradsw, iradlw,        &
       irad_always, use_rad_dt_cosz, spectralflux, use_rad_uniform_angle, &
-      rad_uniform_angle, graupel_in_rad
+      rad_uniform_angle, graupel_in_rad, p_top_for_rrtmgp
    !-----------------------------------------------------------------------------
 
    if (masterproc) then
       open( newunit=unitn, file=trim(nlfile), status='old' )
       call find_group_name(unitn, 'radiation_nl', status=ierr)
       if (ierr == 0) then
-         read(unitn, radiation_nl, iostat=ierr)
+         read(unitn, radiation_nl, iostat=ierr, iomsg=errmsg)
          if (ierr /= 0) then
-            write(errmsg,'(a,i5)') 'iostat =', ierr
             call endrun(sub//': ERROR reading namelist: '//trim(errmsg))
          end if
       end if
@@ -322,6 +323,8 @@ subroutine radiation_readnl(nlfile)
    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: rad_uniform_angle")   
    call mpi_bcast(graupel_in_rad, 1, mpi_logical, mstrid, mpicom, ierr)
    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: graupel_in_rad")
+   call mpi_bcast(p_top_for_rrtmgp, 1, mpi_real8, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: p_top_for_rrtmgp")
 
    if (use_rad_uniform_angle .and. rad_uniform_angle == -99._r8) then
       call endrun(sub//': ERROR - use_rad_uniform_angle is set to .true,' &
@@ -479,10 +482,10 @@ subroutine radiation_init(pbuf2d)
    ! Set up inputs to RRTMGP
    call rrtmgp_inputs_setup_init(ktopcam, ktoprad, nlaycam, sw_low_bounds, sw_high_bounds, nswbands,               &
                    pref_edge, nlay, pver, pverp, kdist_sw, kdist_lw, qrl_unused, is_first_step(), use_rad_dt_cosz, &
-                   get_step_size(), get_nstep(), iradsw, dt_avg, irad_always, is_first_restart_step(), masterproc, &
-                   nlwbands, nradgas, gasnamelength, iulog, idx_sw_diag, idx_nir_diag, idx_uv_diag,          &
-                   idx_sw_cloudsim, idx_lw_diag, idx_lw_cloudsim, nswgpts, nlwgpts, nlayp,                   &
-                   nextsw_cday, get_curr_calday(), band2gpt_sw, errmsg, errflg)
+                   get_step_size(), get_nstep(), iradsw, dt_avg, irad_always, is_first_restart_step(),             &
+                   p_top_for_rrtmgp, nlwbands, nradgas, gasnamelength, idx_sw_diag, idx_nir_diag, idx_uv_diag,     &
+                   idx_sw_cloudsim, idx_lw_diag, idx_lw_cloudsim, nswgpts, nlwgpts, nlayp, nextsw_cday,            &
+                   get_curr_calday(), band2gpt_sw, errmsg, errflg)
    if (errflg /= 0) then
       call endrun(sub//': '//errmsg)
    end if
