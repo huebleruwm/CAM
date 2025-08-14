@@ -738,6 +738,9 @@ elsif ($rad_pkg =~ m/rrtmgp/) {
     $rel_path = $nl->get_value('rrtmgp_coefs_sw_file');
     my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
     $nl->set_variable_value('radiation_nl', 'rrtmgp_coefs_sw_file', $abs_path);
+
+    add_default($nl, 'p_top_for_rrtmgp');
+
 }
 
 # Solar irradiance
