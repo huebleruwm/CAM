@@ -223,18 +223,6 @@ integer :: ktoprad ! Index in RRTMGP arrays of the layer or interface correspond
 integer :: nlwgpts
 integer :: nswgpts
 
-! Cloud optics variables
-real(kind=r8), allocatable :: abs_lw_ice(:,:)
-real(kind=r8), allocatable :: asm_sw_ice(:,:)
-real(kind=r8), allocatable :: ssa_sw_ice(:,:)
-real(kind=r8), allocatable :: ext_sw_ice(:,:)
-real(kind=r8), allocatable :: abs_lw_liq(:,:,:)
-real(kind=r8), allocatable :: ext_sw_liq(:,:,:)
-real(kind=r8), allocatable :: ssa_sw_liq(:,:,:)
-real(kind=r8), allocatable :: asm_sw_liq(:,:,:)
-real(kind=r8), allocatable :: g_lambda(:,:)
-real(kind=r8), allocatable :: g_mu(:)
-real(kind=r8), allocatable :: g_d_eff(:)
 real(kind=r8) :: tiny
 
 ! Band indices for bands containing specific wavelengths
