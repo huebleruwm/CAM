@@ -2172,6 +2172,7 @@ sub write_filepath
     # in the list of filepaths.
     print $fh "$camsrcdir/src/physics/cam\n";
     print $fh "$camsrcdir/src/atmos_phys/to_be_ccppized\n";
+    print $fh "$camsrcdir/src/atmos_phys/to_be_ccppized/radiation_utils\n";
     print $fh "$camsrcdir/src/atmos_phys/phys_utils\n";
 
     # Add the CCPP'ized subdirectories
@@ -2207,6 +2208,9 @@ sub write_filepath
     print $fh "$camsrcdir/src/control\n";
     print $fh "$camsrcdir/src/utils\n";
     print $fh "$camsrcdir/src/utils/cam_ccpp\n";
+
+    # Routines from CAM-SIMA
+    print $fh "$camsrcdir/src/utils/cam-sima/src/physics/utils\n";
 
     $fh->close;
 }
