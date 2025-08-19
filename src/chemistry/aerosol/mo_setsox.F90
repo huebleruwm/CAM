@@ -21,7 +21,7 @@ module mo_setsox
 
   logical :: cloud_borne = .false.
 
-  ! Inidices for species in the shared array of Henry's Law constant parameters
+  ! Indices for species in the shared array of Henry's Law constant parameters
   integer :: heff_id_hno3, heff_id_so2, heff_id_nh3, heff_id_co2, heff_id_h2o2, heff_id_o3
 
 contains
@@ -890,7 +890,7 @@ contains
    !-----------------------------------------------------------------
    !       ... looks up Effective Henry's Law Constant parameters
    !-----------------------------------------------------------------
-   pure elemental integer function get_heff_index(species_name) result(index)
+   pure integer function get_heff_index(species_name) result(index)
       use shr_drydep_mod, only: species_name_table, dheff
      
       character(len=*), intent(in) :: species_name
