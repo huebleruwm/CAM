@@ -261,9 +261,9 @@ end subroutine radheat_readnl
     real(r8) :: xommr(pcols,pver)   ! O
     real(r8) :: xn2mmr(pcols,pver)  ! N2
 
-    real(r8), parameter :: N2_VMR       = 0.78084 ! From US standard atmosphere
-    real(r8), parameter :: N2_mass      = 28.0134 ! g/mol
-    real(r8), parameter :: mass_dry_air = 28.9647 ! g/mol
+    real(r8), parameter :: N2_VMR       = 0.78084_r8 ! From US standard atmosphere
+    real(r8), parameter :: N2_mass      = 28.0134_r8 ! g/mol
+    real(r8), parameter :: mass_dry_air = 28.9647_r8 ! g/mol
 
     integer  :: icall
     real(r8), pointer  :: gas_mmr(:,:)
