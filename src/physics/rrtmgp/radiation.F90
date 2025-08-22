@@ -147,6 +147,8 @@ logical :: spectralflux     = .false. ! calculate fluxes (up and down) per band.
 logical :: graupel_in_rad   = .false. ! graupel in radiation code
 logical :: use_rad_uniform_angle = .false. ! if true, use the namelist rad_uniform_angle for the coszrs calculation
 
+real(r8) :: p_top_for_rrtmgp = 0._r8 ! top pressure for RRTMGP
+
 ! Gathered indices of day and night columns 
 integer :: nday           ! Number of daylight columns
 integer :: nnite          ! Number of night columns
@@ -220,18 +222,6 @@ integer :: ktoprad ! Index in RRTMGP arrays of the layer or interface correspond
 integer :: nlwgpts
 integer :: nswgpts
 
-! Cloud optics variables
-real(kind=r8), allocatable :: abs_lw_ice(:,:)
-real(kind=r8), allocatable :: asm_sw_ice(:,:)
-real(kind=r8), allocatable :: ssa_sw_ice(:,:)
-real(kind=r8), allocatable :: ext_sw_ice(:,:)
-real(kind=r8), allocatable :: abs_lw_liq(:,:,:)
-real(kind=r8), allocatable :: ext_sw_liq(:,:,:)
-real(kind=r8), allocatable :: ssa_sw_liq(:,:,:)
-real(kind=r8), allocatable :: asm_sw_liq(:,:,:)
-real(kind=r8), allocatable :: g_lambda(:,:)
-real(kind=r8), allocatable :: g_mu(:)
-real(kind=r8), allocatable :: g_d_eff(:)
 real(kind=r8) :: tiny
 
 ! Band indices for bands containing specific wavelengths
@@ -284,16 +274,15 @@ subroutine radiation_readnl(nlfile)
    namelist /radiation_nl/ &
       rrtmgp_coefs_lw_file, rrtmgp_coefs_sw_file, iradsw, iradlw,        &
       irad_always, use_rad_dt_cosz, spectralflux, use_rad_uniform_angle, &
-      rad_uniform_angle, graupel_in_rad
+      rad_uniform_angle, graupel_in_rad, p_top_for_rrtmgp
    !-----------------------------------------------------------------------------
 
    if (masterproc) then
       open( newunit=unitn, file=trim(nlfile), status='old' )
       call find_group_name(unitn, 'radiation_nl', status=ierr)
       if (ierr == 0) then
-         read(unitn, radiation_nl, iostat=ierr)
+         read(unitn, radiation_nl, iostat=ierr, iomsg=errmsg)
          if (ierr /= 0) then
-            write(errmsg,'(a,i5)') 'iostat =', ierr
             call endrun(sub//': ERROR reading namelist: '//trim(errmsg))
          end if
       end if
@@ -321,6 +310,8 @@ subroutine radiation_readnl(nlfile)
    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: rad_uniform_angle")   
    call mpi_bcast(graupel_in_rad, 1, mpi_logical, mstrid, mpicom, ierr)
    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: graupel_in_rad")
+   call mpi_bcast(p_top_for_rrtmgp, 1, mpi_real8, mstrid, mpicom, ierr)
+   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: p_top_for_rrtmgp")
 
    if (use_rad_uniform_angle .and. rad_uniform_angle == -99._r8) then
       call endrun(sub//': ERROR - use_rad_uniform_angle is set to .true,' &
@@ -481,10 +472,10 @@ subroutine radiation_init(pbuf2d)
    ! Set up inputs to RRTMGP
    call rrtmgp_inputs_setup_init(ktopcam, ktoprad, nlaycam, sw_low_bounds, sw_high_bounds, nswbands,               &
                    pref_edge, nlay, pver, pverp, kdist_sw, kdist_lw, qrl_unused, is_first_step(), use_rad_dt_cosz, &
-                   get_step_size(), get_nstep(), iradsw, dt_avg, irad_always, is_first_restart_step(), masterproc, &
-                   nlwbands, nradgas, gasnamelength, iulog, idx_sw_diag, idx_nir_diag, idx_uv_diag,          &
-                   idx_sw_cloudsim, idx_lw_diag, idx_lw_cloudsim, nswgpts, nlwgpts, nlayp,                   &
-                   nextsw_cday, get_curr_calday(), band2gpt_sw, errmsg, errflg)
+                   get_step_size(), get_nstep(), iradsw, dt_avg, irad_always, is_first_restart_step(),             &
+                   p_top_for_rrtmgp, nlwbands, nradgas, gasnamelength, idx_sw_diag, idx_nir_diag, idx_uv_diag,     &
+                   idx_sw_cloudsim, idx_lw_diag, idx_lw_cloudsim, nswgpts, nlwgpts, nlayp, nextsw_cday,            &
+                   get_curr_calday(), band2gpt_sw, errmsg, errflg)
    if (errflg /= 0) then
       call endrun(sub//': '//errmsg)
    end if
@@ -505,9 +496,7 @@ subroutine radiation_init(pbuf2d)
    call rad_data_init(pbuf2d)
 
    ! Read ice and liquid optics files
-   call cloud_rad_props_init(abs_lw_liq, abs_lw_ice, &
-                  ext_sw_liq, ssa_sw_liq, asm_sw_liq, ext_sw_ice, ssa_sw_ice, &
-                  asm_sw_ice, g_mu, g_lambda, g_d_eff, tiny)
+   call cloud_rad_props_init(tiny)
    if (errflg /= 0) then
       call endrun(sub//': '//errmsg)
    end if
@@ -1322,10 +1311,9 @@ subroutine radiation_tend( &
          ! Set cloud optical properties in cloud_lw object.
          call rrtmgp_lw_cloud_optics_run(dolw, ncol, nlay, nlaycam, cld(:ncol,:), cldfsnow_in,     &
              cldfgrau_in, cldfprime(:ncol,:), kdist_lw, cloud_lw, lambda(:ncol,:), mu(:ncol,:),    &
-             iclwp(:ncol,:), iciwp(:ncol,:), abs_lw_liq, abs_lw_ice, g_mu, g_lambda, g_d_eff,      &
-             tiny, dei(:ncol,:), icswp(:ncol,:), des(:ncol,:), icgrauwp(:ncol,:), degrau(:ncol,:), &
-             nlwbands, do_snow, do_graupel, pver, ktopcam, tauc, cldf, cld_lw_abs, snow_lw_abs,    &
-             grau_lw_abs, errmsg, errflg)
+             iclwp(:ncol,:), iciwp(:ncol,:), tiny, dei(:ncol,:), icswp(:ncol,:), des(:ncol,:),     &
+             icgrauwp(:ncol,:), degrau(:ncol,:), nlwbands, do_snow, do_graupel, pver, ktopcam,     &
+             tauc, cldf, cld_lw_abs, snow_lw_abs, grau_lw_abs, errmsg, errflg)
          if (errflg /= 0) then
             call endrun(sub//': '//errmsg)
          end if
