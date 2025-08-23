@@ -1202,14 +1202,13 @@ subroutine radiation_tend( &
       if (dosw) then
 
          ! Set cloud optical properties in cloud_sw object.
-         call rrtmgp_sw_cloud_optics_run(dosw, ncol, pver, ktopcam, ktoprad, nlay, nswgpts, nday, idxday, &
-             fillvalue, nswbands, iulog, mu(:ncol,:), lambda(:ncol,:), nnite, idxnite, cld, cldfsnow(:,:), &
-             cldfgrau(:,:), cldfprime(:ncol,:), cld_tau(:,:ncol,:), grau_tau(:,:ncol,:), snow_tau(:,:ncol,:), degrau(:ncol,:),    &
-             dei(:ncol,:), des(:ncol,:), iclwp(:ncol,:), iciwp(:ncol,:), icswp(:ncol,:), icgrauwp(:ncol,:), tiny, ext_sw_liq, ssa_sw_liq, &
-                asm_sw_liq, ext_sw_ice, asm_sw_ice, ssa_sw_ice, g_mu, g_d_eff, g_lambda,&
-                idx_sw_diag, do_graupel, do_snow, kdist_sw, c_cld_tau(:,:ncol,:),        &
-             c_cld_tau_w(:,:ncol,:), c_cld_tau_w_g(:,:ncol,:), rd%tot_cld_vistau(:ncol,:), rd%tot_icld_vistau(:ncol,:), &
-             rd%liq_icld_vistau(:ncol,:), rd%ice_icld_vistau(:ncol,:), &
+         call rrtmgp_sw_cloud_optics_run(dosw, ncol, pver, ktopcam, ktoprad, nlay, nswgpts, nday, idxday,     &
+             fillvalue, nswbands, iulog, mu(:ncol,:), lambda(:ncol,:), nnite, idxnite, cld, cldfsnow(:,:),    &
+             cldfgrau(:,:), cldfprime(:ncol,:), cld_tau(:,:ncol,:), grau_tau(:,:ncol,:), snow_tau(:,:ncol,:), &
+             degrau(:ncol,:), dei(:ncol,:), des(:ncol,:), iclwp(:ncol,:), iciwp(:ncol,:), icswp(:ncol,:),     &
+             icgrauwp(:ncol,:), tiny, idx_sw_diag, do_graupel, do_snow, kdist_sw, c_cld_tau(:,:ncol,:),       &
+             c_cld_tau_w(:,:ncol,:), c_cld_tau_w_g(:,:ncol,:), rd%tot_cld_vistau(:ncol,:),                    &
+             rd%tot_icld_vistau(:ncol,:), rd%liq_icld_vistau(:ncol,:), rd%ice_icld_vistau(:ncol,:),           &
              rd%snow_icld_vistau(:ncol,:), rd%grau_icld_vistau(:ncol,:), errmsg, errflg)
          if (errflg /= 0) then
             call endrun(sub//': '//errmsg)
