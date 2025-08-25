@@ -870,6 +870,7 @@ subroutine vertical_diffusion_tend( &
   real(r8) :: shflux(pcols)
   real(r8) :: cflux(pcols,pcnst)
   integer,  pointer :: clubbtop(:)   ! (pcols)
+  real(r8) :: clubbtop_r(pcols)
 
   logical  :: lq(pcnst)
 
@@ -1264,6 +1265,9 @@ subroutine vertical_diffusion_tend( &
         errmsg    = errmsg,                   &
         errflg    = errflg)
 
+      call pbuf_get_field(pbuf, clubbtop_idx, clubbtop)
+      clubbtop_r = real(clubbtop, r8)
+
       !REMOVECAM - no longer need this when CAM is retired and pcols no longer exists
       kvm(:,:) = 0._r8
       kvh(:,:) = 0._r8
@@ -1278,6 +1282,8 @@ subroutine vertical_diffusion_tend( &
         ! Input from hb_pbl_independent_coefficients
         s2        = s2(:ncol,:pver),                           &
         ri        = ri(:ncol,:pver),                           &
+        ! Zero out HB below this level, where CLUBB is active:
+        bottom_boundary = clubbtop_r(:ncol),                   &
         ! Output variables
         kvm       = kvm(:ncol,:pverp),                         &
         kvh       = kvh(:ncol,:pverp),                         &
@@ -1286,20 +1292,6 @@ subroutine vertical_diffusion_tend( &
         cgs       = cgs(:ncol,:pverp),                         &
         errmsg    = errmsg,                                    &
         errflg    = errflg)
-
-      call pbuf_get_field(pbuf, clubbtop_idx, clubbtop)
-      !
-      ! zero out HB where CLUBB is active
-      !
-      do i=1,ncol
-        do k=clubbtop(i),pverp
-          kvm(i,k) = 0.0_r8
-          kvh(i,k) = 0.0_r8
-          kvq(i,k) = 0.0_r8
-          cgs(i,k) = 0.0_r8
-          cgh(i,k) = 0.0_r8
-        end do
-      end do
 
       call outfld( 'HB_ri',          ri,         pcols,   lchnk )
     else
