@@ -5,7 +5,7 @@ write_nstep0=.true.
 inithist='ENDOFRUN'
 
  prescribed_strataero_datapath = '$DIN_LOC_ROOT/atm/cam/volc'
- prescribed_strataero_file     = 'ozone_strataero_f.e30_beta02.FCts4MTHIST.ne30.104_1980_2014_c20241104.nc'
+ prescribed_strataero_file     = 'TEST_ONLY_strataero_mam5_1980_2014_c20250826.nc'
  prescribed_strataero_type     = 'SERIAL'
  prescribed_strataero_use_chemtrop = .true.
 
