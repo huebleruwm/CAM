@@ -2542,7 +2542,7 @@
       <option name="wallclock">00:10:00</option>
     </options>
   </test>
-  <test compset="PC5" grid="f45_f45_mt232" name="SMS_D_Ld2" testmods="cam/outfrq24h_port">
+  <test compset="PC5" grid="f45_f45_mg37" name="SMS_D_Ld2" testmods="cam/outfrq24h_port">
     <machines>
       <machine name="izumi" compiler="nag" category="aux_cam"/>
     </machines>
