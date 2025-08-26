@@ -78,7 +78,8 @@ module prescribed_strataero
   integer            :: mmr_ndx5 = -1
 
   logical            :: prescribed_strataero_use_chemtrop = .false.
-  logical            :: three_mode = .true.
+  logical            :: three_mode = .false.
+  logical            :: five_mode = .false.
   integer :: rad_fld_no=-1, sad_fld_no=-1
 
 contains
@@ -201,12 +202,10 @@ end subroutine prescribed_strataero_readnl
        call pio_seterrorhandling(file_handle, PIO_BCAST_ERROR)
 
        ierr = pio_inq_varid( file_handle, 'so4mass_a1', varid )
-       three_mode = three_mode .and. (ierr.eq.PIO_NOERR)
+       three_mode = (ierr.eq.PIO_NOERR)
        ierr = pio_inq_varid( file_handle, 'so4mass_a2', varid )
        three_mode = three_mode .and. (ierr.eq.PIO_NOERR)
        ierr = pio_inq_varid( file_handle, 'so4mass_a3', varid )
-       three_mode = three_mode .and. (ierr.eq.PIO_NOERR)
-       ierr = pio_inq_varid( file_handle, 'so4mass_a5', varid )
        three_mode = three_mode .and. (ierr.eq.PIO_NOERR)
        ierr = pio_inq_varid( file_handle, 'diamwet_a1', varid )
        three_mode = three_mode .and. (ierr.eq.PIO_NOERR)
@@ -214,14 +213,36 @@ end subroutine prescribed_strataero_readnl
        three_mode = three_mode .and. (ierr.eq.PIO_NOERR)
        ierr = pio_inq_varid( file_handle, 'diamwet_a3', varid )
        three_mode = three_mode .and. (ierr.eq.PIO_NOERR)
+
+       ierr = pio_inq_varid( file_handle, 'so4mass_a5', varid )
+       five_mode = (ierr.eq.PIO_NOERR)
        ierr = pio_inq_varid( file_handle, 'diamwet_a5', varid )
-       three_mode = three_mode .and. (ierr.eq.PIO_NOERR)
+       five_mode = five_mode .and. (ierr.eq.PIO_NOERR)
+
+       three_mode = three_mode .and. (.not.five_mode)
 
        call pio_seterrorhandling(file_handle, PIO_INTERNAL_ERROR)
 
        call pio_closefile( file_handle )
 
        if (three_mode) then
+          call pbuf_add_field(mmr_name1, 'physpkg', dtype_r8,(/pcols,pver/), mmr_ndx1)
+          call pbuf_add_field(mmr_name2, 'physpkg', dtype_r8,(/pcols,pver/), mmr_ndx2)
+          call pbuf_add_field(mmr_name3, 'physpkg', dtype_r8,(/pcols,pver/), mmr_ndx3)
+          call pbuf_add_field(rad_name1, 'physpkg', dtype_r8,(/pcols,pver/), rad_ndx1)
+          call pbuf_add_field(rad_name2, 'physpkg', dtype_r8,(/pcols,pver/), rad_ndx2)
+          call pbuf_add_field(rad_name3, 'physpkg', dtype_r8,(/pcols,pver/), rad_ndx3)
+          call pbuf_add_field(sad_name, 'physpkg', dtype_r8,(/pcols,pver/), sad_ndx)
+          specifier(1:7) = (/'VOLC_MMR1:so4mass_a1            ', &
+                             'VOLC_MMR2:so4mass_a2            ', &
+                             'VOLC_MMR3:so4mass_a3            ', &
+                             'VOLC_RAD_GEOM1:diamwet_a1       ', &
+                             'VOLC_RAD_GEOM2:diamwet_a2       ', &
+                             'VOLC_RAD_GEOM3:diamwet_a3       ', &
+                             'VOLC_SAD:SAD_AERO               ' /)
+          rad_fld_no = 4
+          sad_fld_no = 7
+       else if (five_mode) then
           call pbuf_add_field(mmr_name1, 'physpkg', dtype_r8,(/pcols,pver/), mmr_ndx1)
           call pbuf_add_field(mmr_name2, 'physpkg', dtype_r8,(/pcols,pver/), mmr_ndx2)
           call pbuf_add_field(mmr_name3, 'physpkg', dtype_r8,(/pcols,pver/), mmr_ndx3)
@@ -282,27 +303,29 @@ end subroutine prescribed_strataero_readnl
     call trcdata_init( specifier, filename, filelist, datapath, fields, file, &
                        rmv_file, cycle_yr, fixed_ymd, fixed_tod, data_type)
 
-    if (three_mode) then
+    if (three_mode.or.five_mode) then
        call addfld(dens_name1, (/ 'lev' /), 'I','molecules/cm3', 'prescribed volcanic aerosol number density in Mode 1' )
        call addfld(dens_name2, (/ 'lev' /), 'I','molecules/cm3', 'prescribed volcanic aerosol number density in Mode 2' )
        call addfld(dens_name3, (/ 'lev' /), 'I','molecules/cm3', 'prescribed volcanic aerosol number density in Mode 3' )
-       call addfld(dens_name5, (/ 'lev' /), 'I','molecules/cm3', 'prescribed volcanic aerosol number density in Mode 5' )
        call addfld(mmr_name1, (/ 'lev' /), 'I','kg/kg', 'prescribed volcanic aerosol dry mass mixing ratio in Mode 1' )
        call addfld(mmr_name2, (/ 'lev' /), 'I','kg/kg', 'prescribed volcanic aerosol dry mass mixing ratio in Mode 2' )
        call addfld(mmr_name3, (/ 'lev' /), 'I','kg/kg', 'prescribed volcanic aerosol dry mass mixing ratio in Mode 3' )
-       call addfld(mmr_name5, (/ 'lev' /), 'I','kg/kg', 'prescribed volcanic aerosol dry mass mixing ratio in Mode 5' )
        call addfld(rad_name1, (/ 'lev' /), 'I','m', 'volcanic aerosol geometric-mode radius in Mode 1' )
        call addfld(rad_name2, (/ 'lev' /), 'I','m', 'volcanic aerosol geometric-mode radius in Mode 2' )
        call addfld(rad_name3, (/ 'lev' /), 'I','m', 'volcanic aerosol geometric-mode radius in Mode 3' )
-       call addfld(rad_name5, (/ 'lev' /), 'I','m', 'volcanic aerosol geometric-mode radius in Mode 5' )
        call addfld(mass_name1, (/ 'lev' /), 'I','kg/m^2', 'volcanic aerosol vertical mass path in layer in Mode 1' )
        call addfld(mass_name2, (/ 'lev' /), 'I','kg/m^2', 'volcanic aerosol vertical mass path in layer in Mode 2' )
        call addfld(mass_name3, (/ 'lev' /), 'I','kg/m^2', 'volcanic aerosol vertical mass path in layer in Mode 3' )
-       call addfld(mass_name5, (/ 'lev' /), 'I','kg/m^2', 'volcanic aerosol vertical mass path in layer in Mode 5' )
        call addfld(mass_column_name1, horiz_only, 'I','kg/m^2', 'volcanic aerosol column mass in Mode 1' )
        call addfld(mass_column_name2, horiz_only, 'I','kg/m^2', 'volcanic aerosol column mass in Mode 2' )
        call addfld(mass_column_name3, horiz_only, 'I','kg/m^2', 'volcanic aerosol column mass IN Mode 3' )
-       call addfld(mass_column_name5, horiz_only, 'I','kg/m^2', 'volcanic aerosol column mass IN Mode 5' )
+       if (five_mode) then
+          call addfld(dens_name5, (/ 'lev' /), 'I','molecules/cm3', 'prescribed volcanic aerosol number density in Mode 5' )
+          call addfld(mmr_name5, (/ 'lev' /), 'I','kg/kg', 'prescribed volcanic aerosol dry mass mixing ratio in Mode 5' )
+          call addfld(rad_name5, (/ 'lev' /), 'I','m', 'volcanic aerosol geometric-mode radius in Mode 5' )
+          call addfld(mass_name5, (/ 'lev' /), 'I','kg/m^2', 'volcanic aerosol vertical mass path in layer in Mode 5' )
+          call addfld(mass_column_name5, horiz_only, 'I','kg/m^2', 'volcanic aerosol column mass IN Mode 5' )
+       end if
     else
        call addfld(dens_name, (/ 'lev' /), 'I','molecules/cm3', 'prescribed volcanic aerosol number density' )
        call addfld(mmr_name,  (/ 'lev' /), 'I','kg/kg', 'prescribed volcanic aerosol dry mass mixing ratio' )
@@ -395,11 +418,13 @@ end subroutine prescribed_strataero_readnl
        if (mmr_ndx3>0) call pbuf_get_field(pbuf_chnk, mmr_ndx3, mass3)
        if (mmr_ndx5>0) call pbuf_get_field(pbuf_chnk, mmr_ndx5, mass5)
 
-       if (three_mode) then
+       if (three_mode.or.five_mode) then
           call outfld( dens_name1, mass1(:,:), pcols, state(c)%lchnk)
           call outfld( dens_name2, mass2(:,:), pcols, state(c)%lchnk)
           call outfld( dens_name3, mass3(:,:), pcols, state(c)%lchnk)
-          call outfld( dens_name5, mass5(:,:), pcols, state(c)%lchnk)
+          if (five_mode) then
+             call outfld( dens_name5, mass5(:,:), pcols, state(c)%lchnk)
+          end if
        else
           call outfld( dens_name, mass1(:,:), pcols, state(c)%lchnk)
        endif
@@ -425,11 +450,13 @@ end subroutine prescribed_strataero_readnl
        end select
 
        !MAM output is diamter so we need to half the value
-       if (three_mode) then
+       if (three_mode.or.five_mode) then
           radius1(:ncol,:) = radius_fact*radius1(:ncol,:)*0.5_r8
           radius2(:ncol,:) = radius_fact*radius2(:ncol,:)*0.5_r8
           radius3(:ncol,:) = radius_fact*radius3(:ncol,:)*0.5_r8
-          radius5(:ncol,:) = radius_fact*radius5(:ncol,:)*0.5_r8
+          if (five_mode) then
+             radius5(:ncol,:) = radius_fact*radius5(:ncol,:)*0.5_r8
+          end if
        else
           radius1(:ncol,:) = radius_fact*radius1(:ncol,:)
        endif
@@ -475,29 +502,31 @@ end subroutine prescribed_strataero_readnl
        volcmass1(:ncol,:) = mass1(:ncol,:)*state(c)%pdel(:ncol,:)/gravit
        columnmass1(:ncol) = sum(volcmass1(:ncol,:), 2)
 
-       if (three_mode) then
+       if (three_mode.or.five_mode) then
           volcmass2(:ncol,:) = mass2(:ncol,:)*state(c)%pdel(:ncol,:)/gravit
           volcmass3(:ncol,:) = mass3(:ncol,:)*state(c)%pdel(:ncol,:)/gravit
-          volcmass5(:ncol,:) = mass5(:ncol,:)*state(c)%pdel(:ncol,:)/gravit
           columnmass2(:ncol) = sum(volcmass2(:ncol,:), 2)
           columnmass3(:ncol) = sum(volcmass3(:ncol,:), 2)
-          columnmass5(:ncol) = sum(volcmass5(:ncol,:), 2)
           call outfld( mmr_name1,         mass1(:,:),     pcols, state(c)%lchnk)
           call outfld( mmr_name2,         mass2(:,:),     pcols, state(c)%lchnk)
           call outfld( mmr_name3,         mass3(:,:),     pcols, state(c)%lchnk)
-          call outfld( mmr_name5,         mass5(:,:),     pcols, state(c)%lchnk)
           call outfld( mass_name1,        volcmass1(:,:), pcols, state(c)%lchnk)
           call outfld( mass_name2,        volcmass2(:,:), pcols, state(c)%lchnk)
           call outfld( mass_name3,        volcmass3(:,:), pcols, state(c)%lchnk)
-          call outfld( mass_name5,        volcmass5(:,:), pcols, state(c)%lchnk)
           call outfld( mass_column_name1, columnmass1(:), pcols, state(c)%lchnk)
           call outfld( mass_column_name2, columnmass2(:), pcols, state(c)%lchnk)
           call outfld( mass_column_name3, columnmass3(:), pcols, state(c)%lchnk)
-          call outfld( mass_column_name5, columnmass5(:), pcols, state(c)%lchnk)
           call outfld( rad_name1,         radius1(:,:),   pcols, state(c)%lchnk)
           call outfld( rad_name2,         radius2(:,:),   pcols, state(c)%lchnk)
           call outfld( rad_name3,         radius3(:,:),   pcols, state(c)%lchnk)
-          call outfld( rad_name5,         radius5(:,:),   pcols, state(c)%lchnk)
+          if (five_mode) then
+             volcmass5(:ncol,:) = mass5(:ncol,:)*state(c)%pdel(:ncol,:)/gravit
+             columnmass5(:ncol) = sum(volcmass5(:ncol,:), 2)
+             call outfld( mmr_name5,         mass5(:,:),     pcols, state(c)%lchnk)
+             call outfld( mass_name5,        volcmass5(:,:), pcols, state(c)%lchnk)
+             call outfld( mass_column_name5, columnmass5(:), pcols, state(c)%lchnk)
+             call outfld( rad_name5,         radius5(:,:),   pcols, state(c)%lchnk)
+          end if
        else
           call outfld( mmr_name,         mass1(:,:),     pcols, state(c)%lchnk)
           call outfld( mass_name,        volcmass1(:,:), pcols, state(c)%lchnk)
