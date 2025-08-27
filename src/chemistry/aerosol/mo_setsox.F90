@@ -191,6 +191,11 @@ contains
     ! NOTE: This routine assumes an Ideal Gas.
     !-----------------------------------------------------------------------
     !
+    use physconst,    only : AVOGADRO_KMOL => avogad, &
+                             BOLTZMANN => boltz, &
+                             GAS_CONSTANT_KMOL => r_universal, &
+                             MOLECULAR_WEIGHT_CO2_G_MOL => mwco2, &
+                             MOLECULAR_WEIGHT_DRY_AIR_G_MOL => mwdry
     use ppgrid,       only : pcols, pver
     use chem_mods,    only : gas_pcnst, nfs
     use chem_mods,    only : adv_mass
@@ -239,15 +244,16 @@ contains
     !-----------------------------------------------------------------------
     integer,  parameter :: itermax = 20
     real(r8), parameter :: ph0 = 5.0_r8  ! INITIAL PH VALUES
-    real(r8), parameter :: AVOGADRO = 6.02214076e23_r8          ! mol-1
-    real(r8), parameter :: BOLTZMANN = 1.380649e-23_r8          ! J K-1
     real(r8), parameter :: PASCAL_TO_ATM = 1.0_r8 / 101325.0_r8 ! atm Pa-1
     real(r8), parameter :: M3_TO_L = 1.0e3_r8                   ! L m-3
     real(r8), parameter :: M3_TO_CM3 = 1.0e6_r8                 ! cm3 m-3
+    real(r8), parameter :: G_TO_KG = 1.0e-3_r8                  ! kg g-1
+    real(r8), parameter :: KMOL_TO_MOL = 1.0e3_r8               ! mol kmol-1
     real(r8), parameter :: SMALL_NUMBER = 1.0e-30_r8
+    real(r8), parameter :: AVOGADRO = AVOGADRO_KMOL / KMOL_TO_MOL ! molecule mol-1
     real(r8), parameter :: const0 = 1.e3_r8/AVOGADRO
-    real(r8), parameter :: MOLECULAR_WEIGHT_DRY_AIR = 0.028966_r8  ! kg mol-1
-    real(r8), parameter :: MOLECULAR_WEIGHT_CO2 = 0.044009_r8      ! kg mol-1
+    real(r8)            :: MOLECULAR_WEIGHT_DRY_AIR ! kg mol-1
+    real(r8), parameter :: MOLECULAR_WEIGHT_CO2 = MOLECULAR_WEIGHT_CO2_G_MOL * G_TO_KG ! kg mol-1
     real(r8), parameter :: xa0 = 11._r8
     real(r8), parameter :: xb0 = -.1_r8
     real(r8), parameter :: xa1 = 1.053_r8
@@ -261,7 +267,7 @@ contains
     real(r8), parameter :: kh1 = 1.6e-5_r8         ! HO2(a)          -> H+ + O2-      Reference: JPL 19-5
     real(r8), parameter :: kh2 = 8.3e5_r8          ! HO2(a) + ho2(a) -> h2o2(a) + o2  Reference: JPL; Bielski et al. 1985
     real(r8), parameter :: kh3 = 9.7e7_r8          ! HO2(a) + o2-    -> h2o2(a) + o2  Reference: JPL; Bielski et al. 1985
-    real(r8), parameter :: Ra = BOLTZMANN * AVOGADRO * M3_TO_L * PASCAL_TO_ATM ! universal constant   (atm)/(M-K)
+    real(r8), parameter :: Ra = GAS_CONSTANT_KMOL / KMOL_TO_MOL * M3_TO_L * PASCAL_TO_ATM ! universal constant   (atm)/(M-K)
 
     !
     real(r8) :: xdelso4hp(ncol,pver)
@@ -303,7 +309,7 @@ contains
          henh3,  &            ! henry law const for nh3
          heo3              !!,   &            ! henry law const for o3
 
-   real(r8), pointer :: co2_mass_mixing_ratio(:,:) ! kg kg-1
+    real(r8), pointer :: co2_mass_mixing_ratio(:,:) ! kg kg-1
 
     real(r8), dimension(ncol)  :: work1
     logical :: converged
@@ -322,6 +328,8 @@ contains
     real(r8) :: tmp_neg, tmp_pos
     real(r8) :: yph, yph_lo, yph_hi
     real(r8) :: ynetpos, ynetpos_lo, ynetpos_hi
+
+    MOLECULAR_WEIGHT_DRY_AIR = MOLECULAR_WEIGHT_DRY_AIR_G_MOL * G_TO_KG  ! kg mol-1
 
     !-----------------------------------------------------------------
     !       ... NOTE: The press array is in pascals and must be
@@ -891,7 +899,7 @@ contains
    !       ... looks up Effective Henry's Law Constant parameters
    !-----------------------------------------------------------------
    pure integer function get_heff_index(species_name) result(index)
-      use shr_drydep_mod, only: species_name_table, dheff
+      use shr_drydep_mod, only: species_name_table
      
       character(len=*), intent(in) :: species_name
 
