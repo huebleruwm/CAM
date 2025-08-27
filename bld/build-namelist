@@ -3339,7 +3339,7 @@ if ($cfg->get('microphys') =~ /^mg/) {
 	add_default($nl, 'micro_mg_accre_sees_auto');
 	add_default($nl, 'micro_mg_vtrms_factor');
 	add_default($nl, 'micro_mg_implicit_fall');
-        add_default($nl, 'pumas_stochastic_tau_kernel_filename', 'val'=>"$cfgdir/../src/physics/pumas/KBARF_tau_kernel.dat");
+        add_default($nl, 'pumas_stochastic_tau_kernel_filename', 'val'=>"$cfgdir/../src/atmos_phys/pumas/pumas/KBARF_tau_kernel.dat");
 
         #set path for stochastic_tau_kernel_filename
         my $cam_dir = $cfg->get('cam_dir');
