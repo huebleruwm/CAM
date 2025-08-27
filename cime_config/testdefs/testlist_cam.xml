@@ -77,6 +77,16 @@
       <option name="comment">CAM7-LT with MPAS dynamical core</option>
     </options>
   </test>
+  <test compset="FHISTC_LTso" grid="ne30pg3_ne30pg3_mt232" name="ERS_Ln9" testmods="cam/outfrq9s_gpu_default">
+    <machines>
+      <machine name="derecho" compiler="nvhpc" category="derecho_gpu"/>
+      <machine name="derecho" compiler="nvhpc" category="aux_cam"/>
+    </machines>
+    <options>
+      <option name="comment">CAM7-LT, enable gpu for PUMAS, CLUBB, and RRTMGP</option>
+      <option name="wallclock">00:45:00</option>
+    </options>
+  </test>
 
 <!--              @@@@@@@@@@@@@@@@@@@@@@@@@@@                 -->
 <!--              CAM test-supported COMPSETS                 -->
@@ -1248,15 +1258,6 @@
 <!--                    (unsupported)                         -->
 <!--              @@@@@@@@@@@@@@@@@@@@@@@@@@@                 -->
 
-  <test compset="F2000dev" grid="ne30pg3_ne30pg3_mg17" name="ERS_Ln9" testmods="cam/outfrq9s_gpu_default">
-    <machines>
-      <machine name="derecho" compiler="nvhpc" category="derecho_gpu"/>
-      <machine name="derecho" compiler="nvhpc" category="aux_cam"/>
-    </machines>
-    <options>
-      <option name="wallclock">00:30:00</option>
-    </options>
-  </test>
   <test compset="F2000dev" grid="ne30pg3_ne30pg3_mg17" name="ERS_Ln9" testmods="cam/outfrq9s_gpu_pcols760">
     <machines>
       <machine name="derecho" compiler="nvhpc" category="derecho_gpu"/>
