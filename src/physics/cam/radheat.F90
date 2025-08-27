@@ -85,6 +85,7 @@ end subroutine radheat_readnl
     
     use nlte_fomichev,    only: nlte_fomichev_init
     use phys_control,     only: phys_getopts
+    use radiation,        only: p_top_for_equil_rad
 
     ! args
 
@@ -123,7 +124,7 @@ end subroutine radheat_readnl
     else
        min_pressure_sw =  5._r8
        max_pressure_sw = 50._r8
-       min_pressure_lw = 10._r8
+       min_pressure_lw = p_top_for_equil_rad
        max_pressure_lw = 50._r8
     endif
 

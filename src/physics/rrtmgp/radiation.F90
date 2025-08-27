@@ -72,10 +72,22 @@ public :: &
    radiation_tend,           &! compute heating rates and fluxes
    rad_out_t                  ! type for diagnostic outputs
 
+! Top of valid pressure range (Pa) for this radiation scheme
+! in local thermo. equilibrium. Will be set to
+!
+! p_top_for_rrtmgp
+!
+! below. Will then be used  in CAM's radheat to determine blending region
+! of LTE and non-LTE schemes.
+public :: p_top_for_equil_rad
+
 integer,public, allocatable :: cosp_cnt(:)       ! counter for cosp
 integer,public              :: cosp_cnt_init = 0 !initial value for cosp counter
 
 real(r8), public, protected :: nextsw_cday       ! future radiation calday for surface models
+
+real(r8) :: p_top_for_equil_rad
+
 
 type rad_out_t
    real(r8) :: solin(pcols)         ! Solar incident flux
@@ -467,6 +479,9 @@ subroutine radiation_init(pbuf2d)
       call endrun(sub//': sw '//errmsg)
    end if
 
+   ! Set public variable for use by radheat.
+   p_top_for_equil_rad = p_top_for_rrtmgp
+   
    ! Set up inputs to RRTMGP
    call rrtmgp_inputs_setup_init(ktopcam, ktoprad, nlaycam, sw_low_bounds, sw_high_bounds, nswbands,               &
                    pref_edge, nlay, pver, pverp, kdist_sw, kdist_lw, qrl_unused, is_first_step(), use_rad_dt_cosz, &

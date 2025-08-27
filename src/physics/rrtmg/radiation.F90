@@ -59,9 +59,16 @@ public :: &
    radiation_tend,           &! compute heating rates and fluxes
    rad_out_t                  ! type for diagnostic outputs
 
+! Top of valid pressure range (Pa) for this radiation scheme
+! in local thermo. equilibrium. No limits for this
+! scheme, so will be set to zero below
+public :: p_top_for_equil_rad
+
 integer,public, allocatable :: cosp_cnt(:)       ! counter for cosp
 integer,public              :: cosp_cnt_init = 0 !initial value for cosp counter
 real(r8), public, protected :: nextsw_cday       ! future radiation calday for surface models
+
+real(r8) :: p_top_for_equil_rad = 0._r8
 
 type rad_out_t
    real(r8) :: solin(pcols)         ! Solar incident flux
