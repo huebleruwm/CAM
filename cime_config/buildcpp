@@ -80,7 +80,7 @@ def buildcpp(case):
          config_opts += ["-fv3core_libdir", os.path.join(exeroot,"atm","obj","atmos_cubed_sphere")]
          libs = case.get_values("CASE_SUPPORT_LIBRARIES")
          if libs is not None and "FMS" not in libs:
-             libs.extend(["gptl","pio","csm_share","FMS")
+             libs.extend(["gptl","pio","csm_share","FMS"])
              case.set_value("CASE_SUPPORT_LIBRARIES", ",".join(libs))
     # The ocean component setting is only used by CAM to do attribute matching for
     # setting default tuning parameter values.  In SOM mode we want to use the same
