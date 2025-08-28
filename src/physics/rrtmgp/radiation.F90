@@ -72,22 +72,10 @@ public :: &
    radiation_tend,           &! compute heating rates and fluxes
    rad_out_t                  ! type for diagnostic outputs
 
-! Top of valid pressure range (Pa) for this radiation scheme
-! in local thermo. equilibrium. Will be set to
-!
-! p_top_for_rrtmgp
-!
-! below. Will then be used  in CAM's radheat to determine blending region
-! of LTE and non-LTE schemes.
-public :: p_top_for_equil_rad
-
 integer,public, allocatable :: cosp_cnt(:)       ! counter for cosp
 integer,public              :: cosp_cnt_init = 0 !initial value for cosp counter
 
 real(r8), public, protected :: nextsw_cday       ! future radiation calday for surface models
-
-real(r8) :: p_top_for_equil_rad
-
 
 type rad_out_t
    real(r8) :: solin(pcols)         ! Solar incident flux
@@ -159,8 +147,6 @@ logical :: use_rad_dt_cosz  = .false. ! if true, use radiation dt for all cosz c
 logical :: spectralflux     = .false. ! calculate fluxes (up and down) per band.
 logical :: graupel_in_rad   = .false. ! graupel in radiation code
 logical :: use_rad_uniform_angle = .false. ! if true, use the namelist rad_uniform_angle for the coszrs calculation
-
-real(r8) :: p_top_for_rrtmgp = 0._r8 ! top pressure for RRTMGP
 
 ! Gathered indices of day and night columns 
 integer :: nday           ! Number of daylight columns
@@ -287,7 +273,7 @@ subroutine radiation_readnl(nlfile)
    namelist /radiation_nl/ &
       rrtmgp_coefs_lw_file, rrtmgp_coefs_sw_file, iradsw, iradlw,        &
       irad_always, use_rad_dt_cosz, spectralflux, use_rad_uniform_angle, &
-      rad_uniform_angle, graupel_in_rad, p_top_for_rrtmgp
+      rad_uniform_angle, graupel_in_rad
    !-----------------------------------------------------------------------------
 
    if (masterproc) then
@@ -323,8 +309,6 @@ subroutine radiation_readnl(nlfile)
    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: rad_uniform_angle")   
    call mpi_bcast(graupel_in_rad, 1, mpi_logical, mstrid, mpicom, ierr)
    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: graupel_in_rad")
-   call mpi_bcast(p_top_for_rrtmgp, 1, mpi_real8, mstrid, mpicom, ierr)
-   if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: p_top_for_rrtmgp")
 
    if (use_rad_uniform_angle .and. rad_uniform_angle == -99._r8) then
       call endrun(sub//': ERROR - use_rad_uniform_angle is set to .true,' &
@@ -432,6 +416,7 @@ subroutine radiation_init(pbuf2d)
    use rad_constituents,          only: iceopticsfile, liqopticsfile
    use rrtmgp_lw_gas_optics,      only: rrtmgp_lw_gas_optics_init
    use rrtmgp_sw_gas_optics,      only: rrtmgp_sw_gas_optics_init
+   use radheat,                   only: p_top_for_equil_rad
 
    ! Initialize the radiation and cloud optics.
    ! Add fields to the history buffer.
@@ -479,14 +464,11 @@ subroutine radiation_init(pbuf2d)
       call endrun(sub//': sw '//errmsg)
    end if
 
-   ! Set public variable for use by radheat.
-   p_top_for_equil_rad = p_top_for_rrtmgp
-   
    ! Set up inputs to RRTMGP
    call rrtmgp_inputs_setup_init(ktopcam, ktoprad, nlaycam, sw_low_bounds, sw_high_bounds, nswbands,               &
                    pref_edge, nlay, pver, pverp, kdist_sw, kdist_lw, qrl_unused, is_first_step(), use_rad_dt_cosz, &
                    get_step_size(), get_nstep(), iradsw, dt_avg, irad_always, is_first_restart_step(),             &
-                   p_top_for_rrtmgp, nlwbands, nradgas, gasnamelength, idx_sw_diag, idx_nir_diag, idx_uv_diag,     &
+                   p_top_for_equil_rad, nlwbands, nradgas, gasnamelength, idx_sw_diag, idx_nir_diag, idx_uv_diag,  &
                    idx_sw_cloudsim, idx_lw_diag, idx_lw_cloudsim, nswgpts, nlwgpts, nlayp, nextsw_cday,            &
                    get_curr_calday(), band2gpt_sw, errmsg, errflg)
    if (errflg /= 0) then
