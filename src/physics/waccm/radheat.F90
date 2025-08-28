@@ -78,7 +78,7 @@ contains
     use namelist_utils,  only: find_group_name
     use units,           only: getunit, freeunit
     use cam_abortutils,  only: endrun
-    use spmd_utils,     only : mpicom, masterprocid, mpi_logical, mpi_integer
+    use spmd_utils,     only : mpicom, masterprocid, mpi_logical, mpi_integer, mpi_real8
 
     use waccm_forcing,   only: waccm_forcing_readnl
 
