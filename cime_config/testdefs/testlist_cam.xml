@@ -261,13 +261,14 @@
     </options>
   </test>
 
-  <test compset="F2000climo" grid="C96_C96_mg17" name="ERP_Ln9" testmods="cam/outfrq9s_mg3">
+  <test compset="F2000climo" grid="C96_C96_mt232" name="ERC_Ln9" testmods="cam/outfrq9s">
     <machines>
       <machine name="derecho" compiler="intel" category="prebeta"/>
       <machine name="derecho" compiler="intel" category="aux_cam"/>
       <machine name="derecho" compiler="intel" category="fv3_cam"/>
     </machines>
     <options>
+      <option name="comment">CAM6, FV3</option>
       <option name="wallclock">00:30:00</option>
     </options>
   </test>
@@ -515,7 +516,7 @@
     </options>
   </test>
 
-  <test compset="QPC6" grid="C48_C48_mg17" name="ERP_D_Ln9" testmods="cam/outfrq9s">
+  <test compset="QPC6" grid="C48_C48_mg17" name="ERC_D_Ln9" testmods="cam/outfrq9s">
     <machines>
       <machine name="derecho" compiler="intel" category="prealpha"/>
       <machine name="derecho" compiler="intel" category="fv3_cam"/>
