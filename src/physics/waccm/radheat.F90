@@ -46,7 +46,7 @@ module radheat
   logical :: nlte_limit_co2 = .false. ! if true apply upper limit to co2 in the Fomichev scheme
   logical :: nlte_use_aliarms = .false. ! If true, use ALI-ARMS for the cooling rate calculation
   integer :: nlte_aliarms_every_X = 1 ! Call aliarms every X times radiation is called
-  real(r8) :: p_top_for_equil_rad = 0._r8 ! Pressure top for blending layer
+  real(r8), public :: p_top_for_equil_rad = 0._r8 ! Pressure top for blending layer
 
 ! Private variables for merging heating rates
   real(r8):: qrs_wt(pver)             ! merge weight for cam solar heating
@@ -113,8 +113,8 @@ contains
     if (ierr /= 0) call endrun("radheat_readnl: FATAL: mpi_bcast: nlte_use_aliarms")
     call mpi_bcast (nlte_aliarms_every_X, 1, mpi_integer, masterprocid, mpicom, ierr)
     if (ierr /= 0) call endrun("radheat_readnl: FATAL: mpi_bcast: nlte_aliarms_every_X")
-    call mpi_bcast(p_top_for_equil_rad, 1, mpi_real8, mstrid, mpicom, ierr)
-    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: p_top_for_equil_rad")
+    call mpi_bcast(p_top_for_equil_rad, 1, mpi_real8, masterprocid, mpicom, ierr)
+    if (ierr /= 0) call endrun("radheat_readnl: FATAL: mpi_bcast: p_top_for_equil_rad")
 
     ! Have waccm_forcing read its namelist as well.
     call waccm_forcing_readnl(nlfile)
