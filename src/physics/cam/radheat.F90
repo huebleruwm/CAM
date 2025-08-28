@@ -76,7 +76,7 @@ subroutine radheat_readnl(nlfile)
       open( newunit=unitn, file=trim(nlfile), status='old' )
       call find_group_name(unitn, 'radheat_nl', status=ierr)
       if (ierr == 0) then
-         read(unitn, radiation_nl, iostat=ierr, iomsg=errmsg)
+         read(unitn, radheat_nl, iostat=ierr, iomsg=errmsg)
          if (ierr /= 0) then
             call endrun(sub//': ERROR reading namelist: '//trim(errmsg))
          end if
