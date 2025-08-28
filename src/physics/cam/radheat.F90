@@ -60,6 +60,7 @@ subroutine radheat_readnl(nlfile)
    ! Read radheat_nl namelist group
    use namelist_utils,  only: find_group_name
    use spmd_utils,      only: mpicom, mstrid=>masterprocid, mpi_real8
+   use cam_abortutils,  only: endrun
 
    character(len=*), intent(in) :: nlfile  ! filepath for file containing namelist input
 
