@@ -106,7 +106,6 @@ end subroutine radheat_readnl
     
     use nlte_fomichev,    only: nlte_fomichev_init
     use phys_control,     only: phys_getopts
-    use radiation,        only: p_top_for_equil_rad
 
     ! args
 
