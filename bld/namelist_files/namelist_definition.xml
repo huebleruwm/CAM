@@ -5775,7 +5775,7 @@ Default: FALSE
        group="radheat_nl" valid_values="" >
 Top pressure level for non-LTE blending region
 Default: 1.0 for WACCM/WACCMX
-         10. for all other RRTMGP runs
+         2. for all other RRTMGP runs
          0.0 for all other runs
 </entry>
 

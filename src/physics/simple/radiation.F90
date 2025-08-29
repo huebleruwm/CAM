@@ -11,14 +11,8 @@ save
 public :: &
    radiation_readnl,         &
    radiation_do
-! Top of valid pressure range (Pa) for this radiation scheme
-! in local thermo. equilibrium. No limits for this
-! scheme, so
-! will be set to zero below
-public :: p_top_for_equil_rad
 
 real(r8), public, protected :: nextsw_cday = -1._r8 ! future radiation calday for surface models
-real(r8) :: p_top_for_equil_rad = 0._r8
 
 !========================================================================================
 contains
