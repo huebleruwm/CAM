@@ -8,7 +8,7 @@
 <ncdata hgrid="ne0np4CONUS.ne30x8" nlev="32">atm/cam/inic/se/f.e22.FCnudged.ne0CONUSne30x8_ne0CONUSne30x8_mt12.cesm2_2_alpha06b.001.cam.i.2013-01-01-00000_c200706.nc</ncdata>
 
 <!-- Solar data -->
-<solar_irrad_data_file>atm/cam/solar/SolarForcingCMIP6_18491230-23000102_c20200615.nc</solar_irrad_data_file>
+<solar_irrad_data_file>atm/cam/solar/SolarForcingCMIP7-4.6_18491230-20240101_sumEPP_c20250630.nc</solar_irrad_data_file>
 
 <!-- WACCM GW Settings -->
 <use_gw_front>.true.</use_gw_front>
