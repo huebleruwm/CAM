@@ -383,6 +383,7 @@ subroutine vertical_diffusion_init(pbuf2d)
       amIRoot = masterproc, &
       iulog   = iulog, &
       pver    = pver, &
+      pverp   = pverp, &
       karman  = karman, &
       pref_mid = pref_mid, &
       is_hbr_pbl_scheme = (eddy_scheme .eq. 'HBR'), &
@@ -398,6 +399,7 @@ subroutine vertical_diffusion_init(pbuf2d)
       amIRoot = masterproc, &
       iulog   = iulog, &
       pver    = pver, &
+      pverp   = pverp, &
       karman  = karman, &
       pref_mid = pref_mid, &
       is_hbr_pbl_scheme = (eddy_scheme .eq. 'HBR'), &
@@ -1457,7 +1459,7 @@ subroutine vertical_diffusion_tend( &
          ncol            = ncol,                         &
          pver            = pver,                         &
          pverp           = pverp,                        &
-         ztodt           = ztodt,                        &
+         dt              = ztodt,                        &
          rair            = rair,                         &
          gravit          = gravit,                       &
          do_iss          = do_iss,                       &
@@ -1495,7 +1497,7 @@ subroutine vertical_diffusion_tend( &
     call vertical_diffusion_diffuse_dry_static_energy_run( &
          ncol            = ncol,                         &
          pver            = pver,                         &
-         ztodt           = ztodt,                        &
+         dt              = ztodt,                        &
          gravit          = gravit,                       &
          p               = p,                            & ! Coords1D, pressure coordinates [Pa]
          rhoi            = rhoi(:ncol,:pverp),           &
@@ -1514,7 +1516,7 @@ subroutine vertical_diffusion_tend( &
          ncol            = ncol,                         &
          pver            = pver,                         &
          ncnst           = pcnst,                        &
-         ztodt           = ztodt,                        &
+         dt              = ztodt,                        &
          rair            = rair,                         &
          gravit          = gravit,                       &
          do_diffusion_const = do_diffusion_const_wet,    & ! moist constituents to diffuse
