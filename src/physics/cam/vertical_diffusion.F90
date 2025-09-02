@@ -481,8 +481,8 @@ subroutine vertical_diffusion_init(pbuf2d)
      call addfld( 'TPERT'       , horiz_only    , 'A', 'K'      , 'Perturbation temperature (eddies in PBL)'           )
      call addfld( 'QPERT'       , horiz_only    , 'A', 'kg/kg'  , 'Perturbation specific humidity (eddies in PBL)'     )
 
-     call addfld( 'UFLX'        , (/ 'ilev' /)  , 'A', 'W/m2'   , 'Zonal momentum flux'                                )
-     call addfld( 'VFLX'        , (/ 'ilev' /)  , 'A', 'W/m2'   , 'Meridional momentm flux'                            )
+     call addfld( 'UFLX'        , (/ 'ilev' /)  , 'A', 'N/m2'   , 'Zonal momentum flux'                                )
+     call addfld( 'VFLX'        , (/ 'ilev' /)  , 'A', 'N/m2'   , 'Meridional momentm flux'                            )
      call register_vector_field('UFLX', 'VFLX')
 
      ! For detailed analysis of UW moist turbulence scheme
@@ -688,11 +688,15 @@ subroutine vertical_diffusion_tend( &
   use diffusion_solver,     only: vertical_diffusion_tendencies_run
   use ccpp_constituent_prop_mod, only: ccpp_const_props
 
+  ! Diagnostic utility subroutine shared with CCPP-ized/SIMA
+  use vertical_diffusion_diagnostic_utils, only: vertical_diffusion_diagnostic_profiles
 
   use wv_saturation,        only : qsat
   use diffusion_solver,     only: vertical_diffusion_set_dry_static_energy_at_toa_molecdiff_run
   use molec_diff,           only : compute_molec_diff, vd_lu_qdecomp
   use constituents,         only : qmincg, qmin, cnst_type
+
+  ! Legacy version of diffusion solver supporting molecular diffusion for WACCM.
   use diffusion_solver_cam, only : compute_vdiff
   use air_composition,      only : cpairv, rairv !Needed for calculation of upward H flux
   use air_composition,      only : mbarv
@@ -1359,35 +1363,6 @@ subroutine vertical_diffusion_tend( &
   u_tmp(:ncol,:) = state%u(:ncol,:)
   v_tmp(:ncol,:) = state%v(:ncol,:)
 
-  !------------------------------------------------------ !
-  ! Write profile output before applying diffusion scheme !
-  !------------------------------------------------------ !
-
-  if (.not. is_clubb_scheme) then
-     sl_prePBL(:ncol,:pver)  = s_tmp(:ncol,:) -   latvap * q_tmp(:ncol,:,ixcldliq) &
-          - ( latvap + latice) * q_tmp(:ncol,:,ixcldice)
-     qt_prePBL(:ncol,:pver)  = q_tmp(:ncol,:,1) + q_tmp(:ncol,:,ixcldliq) &
-          + q_tmp(:ncol,:,ixcldice)
-     slv_prePBL(:ncol,:pver) = sl_prePBL(:ncol,:pver) * ( 1._r8 + zvir*qt_prePBL(:ncol,:pver) )
-
-     do k = 1, pver
-        call qsat(state%t(1:ncol,k), state%pmid(1:ncol,k), tem2(1:ncol,k), ftem(1:ncol,k), ncol)
-     end do
-     ftem_prePBL(:ncol,:) = state%q(:ncol,:,1)/ftem(:ncol,:)*100._r8
-
-     call outfld( 'qt_pre_PBL   ', qt_prePBL,                 pcols, lchnk )
-     call outfld( 'sl_pre_PBL   ', sl_prePBL,                 pcols, lchnk )
-     call outfld( 'slv_pre_PBL  ', slv_prePBL,                pcols, lchnk )
-     call outfld( 'u_pre_PBL    ', state%u,                   pcols, lchnk )
-     call outfld( 'v_pre_PBL    ', state%v,                   pcols, lchnk )
-     call outfld( 'qv_pre_PBL   ', state%q(:,:,1),            pcols, lchnk )
-     call outfld( 'ql_pre_PBL   ', state%q(:,:,ixcldliq),     pcols, lchnk )
-     call outfld( 'qi_pre_PBL   ', state%q(:,:,ixcldice),     pcols, lchnk )
-     call outfld( 't_pre_PBL    ', state%t,                   pcols, lchnk )
-     call outfld( 'rh_pre_PBL   ', ftem_prePBL,               pcols, lchnk )
-
-  end if
-
   ! --------------------------------------------------------------------------------- !
   ! Call the diffusivity solver and solve diffusion equation                          !
   ! The final two arguments are optional function references to                       !
@@ -1717,87 +1692,6 @@ subroutine vertical_diffusion_tend( &
      end if
   end do
 
-  ! -------------------------------------------------------- !
-  ! Diagnostics and output writing after applying PBL scheme !
-  ! -------------------------------------------------------- !
-
-  if (.not. is_clubb_scheme) then
-
-     sl(:ncol,:pver)  = s_tmp(:ncol,:) -   latvap           * q_tmp(:ncol,:,ixcldliq) &
-          - ( latvap + latice) * q_tmp(:ncol,:,ixcldice)
-     qt(:ncol,:pver)  = q_tmp(:ncol,:,1) + q_tmp(:ncol,:,ixcldliq) &
-          + q_tmp(:ncol,:,ixcldice)
-     slv(:ncol,:pver) = sl(:ncol,:pver) * ( 1._r8 + zvir*qt(:ncol,:pver) )
-
-     slflx(:ncol,1) = 0._r8
-     qtflx(:ncol,1) = 0._r8
-     uflx(:ncol,1)  = 0._r8
-     vflx(:ncol,1)  = 0._r8
-
-     slflx_cg(:ncol,1) = 0._r8
-     qtflx_cg(:ncol,1) = 0._r8
-     uflx_cg(:ncol,1)  = 0._r8
-     vflx_cg(:ncol,1)  = 0._r8
-
-     do k = 2, pver
-        do i = 1, ncol
-           rhoair     = state%pint(i,k) / ( rair * ( ( 0.5_r8*(slv(i,k)+slv(i,k-1)) - gravit*state%zi(i,k))/cpair ) )
-           slflx(i,k) = kvh(i,k) * &
-                ( - rhoair*(sl(i,k-1)-sl(i,k))/(state%zm(i,k-1)-state%zm(i,k)) &
-                + cgh(i,k) )
-           qtflx(i,k) = kvh(i,k) * &
-                ( - rhoair*(qt(i,k-1)-qt(i,k))/(state%zm(i,k-1)-state%zm(i,k)) &
-                + rhoair*(cam_in%cflx(i,1)+cam_in%cflx(i,ixcldliq)+cam_in%cflx(i,ixcldice))*cgs(i,k) )
-           uflx(i,k)  = kvm(i,k) * &
-                ( - rhoair*(u_tmp(i,k-1)-u_tmp(i,k))/(state%zm(i,k-1)-state%zm(i,k)))
-           vflx(i,k)  = kvm(i,k) * &
-                ( - rhoair*(v_tmp(i,k-1)-v_tmp(i,k))/(state%zm(i,k-1)-state%zm(i,k)))
-           slflx_cg(i,k) = kvh(i,k) * cgh(i,k)
-           qtflx_cg(i,k) = kvh(i,k) * rhoair * ( cam_in%cflx(i,1) + &
-                cam_in%cflx(i,ixcldliq) + cam_in%cflx(i,ixcldice) ) * cgs(i,k)
-           uflx_cg(i,k)  = 0._r8
-           vflx_cg(i,k)  = 0._r8
-        end do
-     end do
-
-     ! Modification : I should check whether slflx(:ncol,pverp) is correctly computed.
-     !                Note also that 'tautotx' is explicit total stress, different from
-     !                the ones that have been actually added into the atmosphere.
-
-     slflx(:ncol,pverp) = cam_in%shf(:ncol)
-     qtflx(:ncol,pverp) = cam_in%cflx(:ncol,1)
-     uflx(:ncol,pverp)  = tautotx(:ncol)
-     vflx(:ncol,pverp)  = tautoty(:ncol)
-
-     slflx_cg(:ncol,pverp) = 0._r8
-     qtflx_cg(:ncol,pverp) = 0._r8
-     uflx_cg(:ncol,pverp)  = 0._r8
-     vflx_cg(:ncol,pverp)  = 0._r8
-
-     if (trim(shallow_scheme) == 'UNICON') then
-        call pbuf_get_field(pbuf, qtl_flx_idx,  qtl_flx)
-        call pbuf_get_field(pbuf, qti_flx_idx,  qti_flx)
-        qtl_flx(:ncol,1) = 0._r8
-        qti_flx(:ncol,1) = 0._r8
-        do k = 2, pver
-           do i = 1, ncol
-              ! For use in the cloud macrophysics
-              ! Note that density is not added here. Also, only consider local transport term.
-              qtl_flx(i,k) = - kvh(i,k)*(q_tmp(i,k-1,1)-q_tmp(i,k,1)+q_tmp(i,k-1,ixcldliq)-q_tmp(i,k,ixcldliq))/&
-                   (state%zm(i,k-1)-state%zm(i,k))
-              qti_flx(i,k) = - kvh(i,k)*(q_tmp(i,k-1,1)-q_tmp(i,k,1)+q_tmp(i,k-1,ixcldice)-q_tmp(i,k,ixcldice))/&
-                   (state%zm(i,k-1)-state%zm(i,k))
-           end do
-        end do
-        do i = 1, ncol
-           rhoair = state%pint(i,pverp)/(rair*((slv(i,pver)-gravit*state%zi(i,pverp))/cpair))
-           qtl_flx(i,pverp) = cam_in%cflx(i,1)/rhoair
-           qti_flx(i,pverp) = cam_in%cflx(i,1)/rhoair
-        end do
-     end if
-
-  end if
-
   ! --------------------------------------------------------------- !
   ! Convert the new profiles into vertical diffusion tendencies.    !
   ! Convert KE dissipative heat change into "temperature" tendency. !
@@ -1833,9 +1727,103 @@ subroutine vertical_diffusion_tend( &
      errmsg      = errmsg, &
      errflg      = errflg)
 
+  ! -------------------------------------------------------- !
+  ! Diagnostics and output writing after applying PBL scheme !
+  ! -------------------------------------------------------- !
+
   if (.not. is_clubb_scheme) then
-     slten(:ncol,:)         = ( sl(:ncol,:) - sl_prePBL(:ncol,:) ) * rztodt
-     qtten(:ncol,:)         = ( qt(:ncol,:) - qt_prePBL(:ncol,:) ) * rztodt
+
+   ! Unified computation of diagnostics shared with CCPP-ized scheme
+   call vertical_diffusion_diagnostic_profiles( &
+        ncol                 = ncol, &
+        pver                 = pver, &
+        pverp                = pverp, &
+        ztodt                = ztodt, &
+        latvap               = latvap, &
+        latice               = latice, &
+        zvir                 = zvir, &
+        cpair                = cpair, &
+        gravit               = gravit, &
+        rair                 = rair, &
+        pint                 = state%pint(:ncol, :pverp), &
+        pmid                 = state%pmid(:ncol, :pver), &
+        zi                   = state%zi(:ncol, :pverp), &
+        zm                   = state%zm(:ncol, :pver), &
+        kvh                  = kvh(:ncol, :pverp), &
+        kvm                  = kvm(:ncol, :pverp), &
+        cgh                  = cgh(:ncol, :pverp), &
+        cgs                  = cgs(:ncol, :pverp), &
+        cam_in_shf           = cam_in%shf(:ncol), &
+        cam_in_cflx_wv       = cam_in%cflx(:ncol, 1), &
+        cam_in_cflx_cldliq   = cam_in%cflx(:ncol, ixcldliq), &
+        cam_in_cflx_cldice   = cam_in%cflx(:ncol, ixcldice), &
+        tautotx              = tautotx(:ncol), & ! these are the surface stresses to HB
+        tautoty              = tautoty(:ncol), & ! these are the surface stresses to HB
+        t0                   = state%t(:ncol, :pver), &
+        q0_wv                = state%q(:ncol, :pver, ixq), &
+        q0_cldliq            = state%q(:ncol, :pver, ixcldliq), &
+        q0_cldice            = state%q(:ncol, :pver, ixcldice), &
+        s0                   = state%s(:ncol, :pver), &
+        u0                   = state%u(:ncol, :pver), &
+        v0                   = state%v(:ncol, :pver), &
+        s1                   = s_tmp(:ncol, :pver), &
+        u1                   = u_tmp(:ncol, :pver), &
+        v1                   = v_tmp(:ncol, :pver), &
+        tend_s               = ptend%s(:ncol, :pver), &
+        tend_u               = ptend%u(:ncol, :pver), &
+        tend_v               = ptend%v(:ncol, :pver), &
+        tend_q_wv            = ptend%q(:ncol, :pver, ixq), &
+        tend_q_cldliq        = ptend%q(:ncol, :pver, ixcldliq), &
+        tend_q_cldice        = ptend%q(:ncol, :pver, ixcldice), &
+        qt_pre_PBL           = qt_prePBL(:ncol, :pver), &
+        sl_pre_PBL           = sl_prePBL(:ncol, :pver), &
+        slv_pre_PBL          = slv_prePBL(:ncol, :pver), &
+        rh_pre_PBL           = ftem_prePBL(:ncol, :pver), &
+        qt_aft_PBL           = qt(:ncol, :pver), &
+        sl_aft_PBL           = sl(:ncol, :pver), &
+        slv_aft_PBL          = slv(:ncol, :pver), &
+        qv_aft_PBL           = qv_aft_PBL(:ncol, :pver), &
+        ql_aft_PBL           = ql_aft_PBL(:ncol, :pver), &
+        qi_aft_PBL           = qi_aft_PBL(:ncol, :pver), &
+        t_aft_PBL            = t_aftPBL(:ncol, :pver), &
+        rh_aft_PBL           = ftem_aftPBL(:ncol, :pver), &
+        u_aft_PBL            = u_aft_PBL(:ncol, :pver), &
+        v_aft_PBL            = v_aft_PBL(:ncol, :pver), &
+        slflx                = slflx(:ncol, :pverp), &
+        qtflx                = qtflx(:ncol, :pverp), &
+        uflx                 = uflx(:ncol, :pverp), &
+        vflx                 = vflx(:ncol, :pverp), &
+        slflx_cg             = slflx_cg(:ncol, :pverp), &
+        qtflx_cg             = qtflx_cg(:ncol, :pverp), &
+        uflx_cg              = uflx_cg(:ncol, :pverp), &
+        vflx_cg              = vflx_cg(:ncol, :pverp), &
+        slten                = slten(:ncol, :pver), &
+        qtten                = qtten(:ncol, :pver), &
+        tten                 = tten(:ncol, :pver), &
+        rhten                = rhten(:ncol, :pver))
+
+     if (trim(shallow_scheme) == 'UNICON') then
+        call pbuf_get_field(pbuf, qtl_flx_idx,  qtl_flx)
+        call pbuf_get_field(pbuf, qti_flx_idx,  qti_flx)
+        qtl_flx(:ncol,1) = 0._r8
+        qti_flx(:ncol,1) = 0._r8
+        do k = 2, pver
+           do i = 1, ncol
+              ! For use in the cloud macrophysics
+              ! Note that density is not added here. Also, only consider local transport term.
+              qtl_flx(i,k) = - kvh(i,k)*(q_tmp(i,k-1,1)-q_tmp(i,k,1)+q_tmp(i,k-1,ixcldliq)-q_tmp(i,k,ixcldliq))/&
+                   (state%zm(i,k-1)-state%zm(i,k))
+              qti_flx(i,k) = - kvh(i,k)*(q_tmp(i,k-1,1)-q_tmp(i,k,1)+q_tmp(i,k-1,ixcldice)-q_tmp(i,k,ixcldice))/&
+                   (state%zm(i,k-1)-state%zm(i,k))
+           end do
+        end do
+        do i = 1, ncol
+           rhoair = state%pint(i,pverp)/(rair*((slv(i,pver)-gravit*state%zi(i,pverp))/cpair))
+           qtl_flx(i,pverp) = cam_in%cflx(i,1)/rhoair
+           qti_flx(i,pverp) = cam_in%cflx(i,1)/rhoair
+        end do
+     end if
+
   end if
 
   ! ------------------------------------------------------------ !
@@ -1892,32 +1880,6 @@ subroutine vertical_diffusion_tend( &
 
   end if
 
-  ! ----------------------------------------------------------------- !
-  ! Re-calculate diagnostic output variables after vertical diffusion !
-  ! ----------------------------------------------------------------- !
-
-  if (.not. is_clubb_scheme) then
-
-     qv_aft_PBL(:ncol,:pver)  =   state%q(:ncol,:pver,1)         + ptend%q(:ncol,:pver,1)        * ztodt
-     ql_aft_PBL(:ncol,:pver)  =   state%q(:ncol,:pver,ixcldliq)  + ptend%q(:ncol,:pver,ixcldliq) * ztodt
-     qi_aft_PBL(:ncol,:pver)  =   state%q(:ncol,:pver,ixcldice)  + ptend%q(:ncol,:pver,ixcldice) * ztodt
-     s_aft_PBL(:ncol,:pver)   =   state%s(:ncol,:pver)           + ptend%s(:ncol,:pver)          * ztodt
-     t_aftPBL(:ncol,:pver)    = ( s_aft_PBL(:ncol,:pver) - gravit*state%zm(:ncol,:pver) ) / cpair
-
-     u_aft_PBL(:ncol,:pver)   =  state%u(:ncol,:pver)          + ptend%u(:ncol,:pver)            * ztodt
-     v_aft_PBL(:ncol,:pver)   =  state%v(:ncol,:pver)          + ptend%v(:ncol,:pver)            * ztodt
-
-     do k = 1, pver
-        call qsat(t_aftPBL(1:ncol,k), state%pmid(1:ncol,k), tem2(1:ncol,k), ftem(1:ncol,k), ncol)
-     end do
-     ftem_aftPBL(:ncol,:pver) = qv_aft_PBL(:ncol,:pver) / ftem(:ncol,:pver) * 100._r8
-
-     tten(:ncol,:pver)        = ( t_aftPBL(:ncol,:pver)    - state%t(:ncol,:pver) )              * rztodt
-     rhten(:ncol,:pver)       = ( ftem_aftPBL(:ncol,:pver) - ftem_prePBL(:ncol,:pver) )          * rztodt
-
-  end if
-
-
   ! -------------------------------------------------------------- !
   ! mass conservation check.........
   ! -------------------------------------------------------------- !
@@ -1962,6 +1924,20 @@ subroutine vertical_diffusion_tend( &
   ! ------------------------------------------- !
 
   if (.not. is_clubb_scheme) then
+
+     ! Write profile output of before diffusion scheme
+     call outfld( 'qt_pre_PBL   ', qt_prePBL,                 pcols, lchnk )
+     call outfld( 'sl_pre_PBL   ', sl_prePBL,                 pcols, lchnk )
+     call outfld( 'slv_pre_PBL  ', slv_prePBL,                pcols, lchnk )
+     call outfld( 'u_pre_PBL    ', state%u,                   pcols, lchnk )
+     call outfld( 'v_pre_PBL    ', state%v,                   pcols, lchnk )
+     call outfld( 'qv_pre_PBL   ', state%q(:,:,1),            pcols, lchnk )
+     call outfld( 'ql_pre_PBL   ', state%q(:,:,ixcldliq),     pcols, lchnk )
+     call outfld( 'qi_pre_PBL   ', state%q(:,:,ixcldice),     pcols, lchnk )
+     call outfld( 't_pre_PBL    ', state%t,                   pcols, lchnk )
+     call outfld( 'rh_pre_PBL   ', ftem_prePBL,               pcols, lchnk )
+
+     ! Standard output variables
      call outfld( 'QT'           , qt,                        pcols, lchnk )
      call outfld( 'SL'           , sl,                        pcols, lchnk )
      call outfld( 'SLV'          , slv,                       pcols, lchnk )
