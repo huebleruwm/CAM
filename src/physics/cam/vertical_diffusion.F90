@@ -1738,7 +1738,7 @@ subroutine vertical_diffusion_tend( &
         ncol                 = ncol, &
         pver                 = pver, &
         pverp                = pverp, &
-        ztodt                = ztodt, &
+        dt                   = ztodt, &
         latvap               = latvap, &
         latice               = latice, &
         zvir                 = zvir, &
