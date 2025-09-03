@@ -1508,7 +1508,7 @@ subroutine vertical_diffusion_tend( &
          ubc_mmr         = ubc_mmr(:ncol,:pcnst),        &
          cnst_fixed_ubc  = cnst_fixed_ubc(:pcnst),       &
          q0              = state%q(:ncol,:pver,:pcnst),  &
-         q               = q_tmp(:ncol,:pver,:pcnst),    &
+         q1              = q_tmp(:ncol,:pver,:pcnst),    &
          errmsg          = errmsg,                       &
          errflg          = errflg)
   else
