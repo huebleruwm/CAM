@@ -4,8 +4,8 @@ module cospsimulator_intr
   !         Name:         CFMIP Observational Simulator Package Version 2 (COSP2)
   !         What:         Simulate ISCCP/CloudSat/CALIPSO/MISR/MODIS cloud products from 
   !                       GCM inputs
-  !         Version:      v2.1.4 (August 2019)
-  !         Authors:      Dustin Swales (dustin.swales@noaa.gov)
+  !         Version:      v2.1.8 (August 2025)
+  !         Authors:      Dustin Swales (dustin.swales@noaa.gov), Jonah Shaw (jonah.shaw@colorado.edu)
   !
   ! Modifications:
   !
@@ -30,7 +30,10 @@ module cospsimulator_intr
        numMODISTauBins, numMODISPresBins, numMODISReffIceBins, numMODISReffLiqBins,    &
        numISCCPTauBins, numISCCPPresBins, numMISRTauBins, reffICE_binEdges,            &
        reffICE_binCenters, reffLIQ_binEdges, reffLIQ_binCenters, LIDAR_NTYPE,          &
-       nCloudsatPrecipClass, &
+       nCloudsatPrecipClass, CFODD_NDBZE, CFODD_NICOD, CFODD_BNDRE, CFODD_NCLASS,      &
+       CFODD_DBZE_MIN, CFODD_DBZE_MAX, CFODD_ICOD_MIN, CFODD_ICOD_MAX,                 &
+       CFODD_DBZE_WIDTH, CFODD_ICOD_WIDTH, WR_NREGIME, CFODD_HISTDBZE,                 &
+       CFODD_HISTDBZEcenters, CFODD_HISTICOD, CFODD_HISTICODcenters, 
        nsza_cosp         => PARASOL_NREFL,       &
        nprs_cosp         => npres,               &
        ntau_cosp         => ntau,                &
@@ -490,6 +493,12 @@ CONTAINS
        call add_hist_coord('cosp_dbze', CLOUDSAT_DBZE_BINS,                    &
             'COSP Mean dBZe for radar simulator CFAD output', 'dBZ',           &
             dbzemid_cosp, bounds_name='cosp_dbze_bnds', bounds=dbzelim_cosp)
+       call add_hist_coord('cosp_cfodd_dbze', CFODD_HISTDBZEcenters                   &
+            'COSP Mean dBZe for radar simulator CFODD output', 'dBZ',                 &
+       )
+       call add_hist_coord('cosp_cfodd_icod', CFODD_HISTICODcenters,                  &
+            'COSP Mean in-cloud optical depth for radar simulator CFODD output', '1', &
+       )
     end if
     
     if (lmisr_sim) then
@@ -697,6 +706,20 @@ CONTAINS
        call addfld('CS_PIA',       horiz_only, 'A', 'dBZ', &
             'CloudSat Radar Path Integrated Attenuation', flag_xyfill=.true., fill_value=R_UNDEF)
 
+       ! CloudSat warm rain diagnostics (Michibata et al. 2019, GMD)
+       call addfld('CS_WR_NOPRECIP',  horiz_only, 'A', '1', &
+            'Frequency of non-precipitating single-layer warm clouds', flag_xyfill=.true., fill_value=R_UNDEF)
+       call addfld('CS_WR_DRIZ',  horiz_only, 'A', '1', &
+            'Frequency of drizzling single-layer warm clouds', flag_xyfill=.true., fill_value=R_UNDEF)
+       call addfld('CS_WR_PRECIP',  horiz_only, 'A', '1', &
+            'Frequency of precipitating single-layer warm clouds', flag_xyfill=.true., fill_value=R_UNDEF)
+       call addfld('CS_WR_CFODD_REFF_SMALL',(/'cosp_cfodd_dbze','cosp_cfodd_icod'/), 'A', 'fraction', &
+            '# of CFODD (05 < Reff < 12 micron)', flag_xyfill=.true., fill_value=R_UNDEF)
+       call addfld('CS_WR_CFODD_REFF_MEDIUM',(/'cosp_cfodd_dbze','cosp_cfodd_icod'/), 'A', 'fraction', &
+            '# of CFODD (12 < Reff < 18 micron)', flag_xyfill=.true., fill_value=R_UNDEF)
+       call addfld('CS_WR_CFODD_REFF_LARGE',(/'cosp_cfodd_dbze','cosp_cfodd_icod'/), 'A', 'fraction', &
+            '# of CFODD (18 < Reff < 35 micron)', flag_xyfill=.true., fill_value=R_UNDEF)
+
        call add_default('CFAD_DBZE94_CS',cosp_histfile_num,' ')
        call add_default('CLD_CAL_NOTCS', cosp_histfile_num,' ')
        call add_default('CLDTOT_CALCS',  cosp_histfile_num,' ')
@@ -713,6 +736,12 @@ CONTAINS
        call add_default('CS_RAINHARD',   cosp_histfile_num,' ')
        call add_default('CS_UN',         cosp_histfile_num,' ')
        call add_default('CS_PIA',        cosp_histfile_num,' ')
+       call add_default('CS_WR_NOPRECIP',         cosp_histfile_num,' ')
+       call add_default('CS_WR_DRIZ',             cosp_histfile_num,' ')
+       call add_default('CS_WR_PRECIP',           cosp_histfile_num,' ')
+       call add_default('CS_WR_CFODD_REFF_SMALL', cosp_histfile_num,' ')
+       call add_default('CS_WR_CFODD_REFF_MEDIUM',cosp_histfile_num,' ')
+       call add_default('CS_WR_CFODD_REFF_LARGE', cosp_histfile_num,' ')
     end if
     
     ! MISR SIMULATOR OUTPUTS
@@ -1136,7 +1165,7 @@ CONTAINS
     ! ######################################################################################
     ! Simulator output info
     ! ######################################################################################
-    integer, parameter :: nf_radar=17                    ! number of radar outputs
+    integer, parameter :: nf_radar=23                    ! number of radar outputs
     integer, parameter :: nf_calipso=28                  ! number of calipso outputs
     integer, parameter :: nf_isccp=9                     ! number of isccp outputs
     integer, parameter :: nf_misr=1                      ! number of misr outputs
@@ -1149,7 +1178,9 @@ CONTAINS
                          'CS_NOPRECIP   ', 'CS_RAINPOSS   ', 'CS_RAINPROB   ', &
                          'CS_RAINCERT   ', 'CS_SNOWPOSS   ', 'CS_SNOWCERT   ', &
                          'CS_MIXPOSS    ', 'CS_MIXCERT    ', 'CS_RAINHARD   ', &
-                         'CS_UN         ', 'CS_PIA        '/)
+                         'CS_UN         ', 'CS_PIA        ', 'CS_WR_NOPRECIP', &
+                         'CS_WR_DRIZ    ', 'CS_WR_PRECIP  ', 'CS_WR_CFODD_REFF_SMALL', &
+                         'CS_WR_CFODD_REFF_MEDIUM', 'CS_WR_CFODD_REFF_LARGE'/)
 
     ! CALIPSO outputs
     character(len=max_fieldname_len),dimension(nf_calipso),parameter :: &
@@ -1268,6 +1299,12 @@ CONTAINS
     real(r8) :: ptcloudsatflag8(pcols)
     real(r8) :: ptcloudsatflag9(pcols)
     real(r8) :: cloudsatpia(pcols)
+    real(r8) :: wr_ocfreq_noprecip_cs(pcols)
+    real(r8) :: wr_ocfreq_drizzle_cs(pcols)
+    real(r8) :: wr_ocfreq_precip_cs(pcols)
+    real(r8) :: cfodd_ntotal_small_cs(pcols,CFODD_NDBZE,CFODD_NICOD)
+    real(r8) :: cfodd_ntotal_medium_cs(pcols,CFODD_NDBZE,CFODD_NICOD)
+    real(r8) :: cfodd_ntotal_large_cs(pcols,CFODD_NDBZE,CFODD_NICOD)
     real(r8) :: cld_cal_notcs(pcols,nht_cosp)
     real(r8) :: atb532_cal(pcols,nlay*nscol_cosp)
     real(r8) :: mol532_cal(pcols,nlay)
@@ -1678,7 +1715,7 @@ CONTAINS
     ! Construct COSP output derived type.
     ! ######################################################################################
     call t_startf("construct_cosp_outputs")
-    call construct_cosp_outputs(ncol, nscol_cosp, nlay, Nlvgrid, cospOUT)
+    call construct_cosp_outputs(ncol, nscol_cosp, nlay, Nlvgrid, use_vgrid, cospOUT)
     call t_stopf("construct_cosp_outputs")
     
     ! ######################################################################################
@@ -1719,7 +1756,7 @@ CONTAINS
     ! need to pass the correct section (:ncol,ktop:pver).
     call subsample_and_optics( &
        ncol, nlay, nscol_cosp, nhydro, overlap, &
-       lidar_ice_type, sd_cs(lchnk), &
+       use_vgrid, lidar_ice_type, sd_cs(lchnk), &
        cld(:ncol,ktop:pver), concld(:ncol,ktop:pver), &
        rain_ls_interp, snow_ls_interp, grpl_ls_interp, rain_cv_interp, &
        snow_cv_interp, mr_lsliq, mr_lsice, mr_ccliq, mr_ccice, &
@@ -1902,7 +1939,14 @@ CONTAINS
        ptcloudsatflag8(1:ncol) = cospOUT%cloudsat_precip_cover(:,9)
        ptcloudsatflag9(1:ncol) = cospOUT%cloudsat_precip_cover(:,10)
        cloudsatpia(1:ncol)     = cospOUT%cloudsat_pia
-       
+
+       ! CloudSat warm rain diagnostics
+       wr_ocfreq_noprecip_cs(1:ncol,1:WR_NREGIME)                 = cospOUT%wr_ocfreq(:,1)
+       wr_ocfreq_drizzle_cs(1:ncol,1:WR_NREGIME)                  = cospOUT%wr_ocfreq(:,2)
+       wr_ocfreq_precip_cs(1:ncol,1:WR_NREGIME)                   = cospOUT%wr_ocfreq(:,3)
+       cfodd_ntotal_small_cs(1:ncol,1:CFODD_NDBZE,1:CFODD_NICOD)  = cospOUT%cfodd_ntotal(:,:,:,1)
+       cfodd_ntotal_medium_cs(1:ncol,1:CFODD_NDBZE,1:CFODD_NICOD) = cospOUT%cfodd_ntotal(:,:,:,2)
+       cfodd_ntotal_large_cs(1:ncol,1:CFODD_NDBZE,1:CFODD_NICOD)  = cospOUT%cfodd_ntotal(:,:,:,3)
     endif
     
     ! CALIPSO
@@ -2200,8 +2244,14 @@ CONTAINS
        call outfld('CS_RAINHARD',   ptcloudsatflag8,  pcols, lchnk)
        call outfld('CS_UN',         ptcloudsatflag9,  pcols, lchnk)
        call outfld('CS_PIA',        cloudsatpia,      pcols, lchnk)
+       call outfld('CS_WR_NOPRECIP',wr_ocfreq_noprecip_cs,   pcols, lchnk)
+       call outfld('CS_WR_DRIZ',    wr_ocfreq_drizzle_cs,    pcols, lchnk)
+       call outfld('CS_WR_PRECIP',  wr_ocfreq_precip_cs,     pcols, lchnk)
+       call outfld('CS_WR_CFODD_REFF_SMALL', cfodd_ntotal_small_cs, pcols, lchnk)
+       call outfld('CS_WR_CFODD_REFF_MEDIUM',cfodd_ntotal_medium_cs,pcols, lchnk)
+       call outfld('CS_WR_CFODD_REFF_LARGE', cfodd_ntotal_large_cs, pcols, lchnk)
     end if
-    
+
     ! MISR SIMULATOR OUTPUTS
     if (lmisr_sim) then
        call outfld('CLD_MISR',cld_misr    ,pcols,lchnk)
@@ -2334,7 +2384,7 @@ CONTAINS
   ! SUBROUTINE subsample_and_optics
   ! ######################################################################################
   subroutine subsample_and_optics(nPoints, nLevels, nColumns, nHydro,overlap,            &
-                                  lidar_ice_type, sd, tca, cca,                          &
+                                  use_vgrid, lidar_ice_type, sd, tca, cca,               &
                                   fl_lsrainIN, fl_lssnowIN, fl_lsgrplIN, fl_ccrainIN,    &
                                   fl_ccsnowIN, mr_lsliq, mr_lsice, mr_ccliq, mr_ccice,   &
                                   reffIN, dtau_c, dtau_s, dem_c, dem_s, dtau_s_snow,     &
@@ -2384,6 +2434,9 @@ CONTAINS
          sfcP            ! Surface pressure 
     type(size_distribution),intent(inout) :: &
          sd
+    logical,intent(in) :: &
+         use_vgrid       ! .false.: outputs on model levels
+                         ! .true.:  outputs on evenly-spaced vertical levels.
     
     ! Outputs
     type(cosp_optical_inputs),intent(inout) :: cospIN
@@ -2653,15 +2706,18 @@ CONTAINS
        enddo
 
        ! Regrid frozen fraction to Cloudsat/Calipso statistical grid
-       allocate(fracPrecipIce_statGrid(nPoints,nColumns,Nlvgrid), stat=istat)
-       call handle_allocate_error(istat, sub, 'fracPrecipIce_statGrid')
-       fracPrecipIce_statGrid(:,:,:) = 0._wp
-       call cosp_change_vertical_grid(Npoints, Ncolumns, Nlevels, cospstateIN%hgt_matrix(:,Nlevels:1:-1), &
-            cospstateIN%hgt_matrix_half(:,Nlevels:1:-1), fracPrecipIce(:,:,Nlevels:1:-1), Nlvgrid,  &
-            vgrid_zl(Nlvgrid:1:-1),  vgrid_zu(Nlvgrid:1:-1), fracPrecipIce_statGrid(:,:,Nlvgrid:1:-1))
+       if (use_vgrid) then
+         allocate(fracPrecipIce_statGrid(nPoints,nColumns,Nlvgrid), stat=istat)
+         call handle_allocate_error(istat, sub, 'fracPrecipIce_statGrid')
+         fracPrecipIce_statGrid(:,:,:) = 0._wp
+         call cosp_change_vertical_grid(Npoints, Ncolumns, Nlevels, cospstateIN%hgt_matrix(:,Nlevels:1:-1), &
+               cospstateIN%hgt_matrix_half(:,Nlevels:1:-1), fracPrecipIce(:,:,Nlevels:1:-1), Nlvgrid,  &
+               vgrid_zl(Nlvgrid:1:-1),  vgrid_zu(Nlvgrid:1:-1), fracPrecipIce_statGrid(:,:,Nlvgrid:1:-1))
 
-       ! For near-surface diagnostics, we only need the frozen fraction at one layer.
-       cospIN%fracPrecipIce(:,:) = fracPrecipIce_statGrid(:,:,cloudsat_preclvl)
+         ! For near-surface diagnostics, we only need the frozen fraction at one layer.
+         cospIN%fracPrecipIce(:,:) = fracPrecipIce_statGrid(:,:,cloudsat_preclvl)
+         deallocate(fracPrecipIce_statGrid)
+       endif
        
     endif
     call t_stopf("cloudsat_optics")
@@ -2888,18 +2944,21 @@ CONTAINS
     call handle_allocate_error(istat, sub, 'sunlit,..,fl_snow')
 
   end subroutine construct_cospstateIN
+
   ! ######################################################################################
   ! SUBROUTINE construct_cosp_outputs
   !
   ! This subroutine allocates output fields based on input logical flag switches.
   ! ######################################################################################  
-  subroutine construct_cosp_outputs(Npoints,Ncolumns,Nlevels,Nlvgrid,x)
+  subroutine construct_cosp_outputs(Npoints,Ncolumns,Nlevels,Nlvgrid,use_vgrid,x)
     ! Inputs
     integer,intent(in) :: &
          Npoints,         & ! Number of sampled points
          Ncolumns,        & ! Number of subgrid columns
          Nlevels,         & ! Number of model levels
          Nlvgrid            ! Number of levels in L3 stats computation
+
+    logical,intent(in) :: use_vgrid ! Logical to indicate if using variable vertical grid
     
     ! Outputs
     type(cosp_outputs),intent(out) :: &
@@ -2998,9 +3057,19 @@ CONTAINS
           x%cloudsat_cfad_ze(Npoints,CLOUDSAT_DBZE_BINS,Nlvgrid), &
           x%lidar_only_freq_cloud(Npoints,Nlvgrid), &
           x%radar_lidar_tcc(Npoints), &
-          x%cloudsat_precip_cover(Npoints,nCloudsatPrecipClass), &
-          x%cloudsat_pia(Npoints), stat=istat)
+          x%wr_ocfreq(Npoints,WR_NREGIME),
+          x%cfodd_ntotal(Npoints,CFODD_NDBZE,CFODD_NICOD,CFODD_NCLASS), &
+          stat=istat)
        call handle_allocate_error(istat, sub, 'cloudsat*')
+       if (use_vgrid) then
+          ! CLOUDSAT Precipitation occurrence diagnostics not available when use_vgrid=FALSE.'
+          ! Turning CLOUDSAT Precipitation occurrence diagnostcs OFF'
+          allocate( &
+             x%cloudsat_precip_cover(Npoints,nCloudsatPrecipClass), &
+             x%cloudsat_pia(Npoints), &
+             stat=istat)
+       endif
+       call handle_allocate_error(istat, sub, 'cloudsat_precip_*')
     endif
 
   end subroutine construct_cosp_outputs
@@ -3031,6 +3100,16 @@ CONTAINS
     if (allocated(y%ss_alb))              deallocate(y%ss_alb)
     if (allocated(y%fracLiq))             deallocate(y%fracLiq)
     if (allocated(y%fracPrecipIce))       deallocate(y%fracPrecipIce)
+    if (allocated(y%rcfg_cloudsat%N_scale_flag))       deallocate(y%rcfg_cloudsat%N_scale_flag)
+    if (allocated(y%rcfg_cloudsat%Z_scale_flag))       deallocate(y%rcfg_cloudsat%Z_scale_flag)
+    if (allocated(y%rcfg_cloudsat%Z_scale_added_flag)) deallocate(y%rcfg_cloudsat%Z_scale_added_flag)
+    if (allocated(y%rcfg_cloudsat%Ze_scaled))          deallocate(y%rcfg_cloudsat%Ze_scaled)
+    if (allocated(y%rcfg_cloudsat%Zr_scaled))          deallocate(y%rcfg_cloudsat%Zr_scaled)
+    if (allocated(y%rcfg_cloudsat%kr_scaled))          deallocate(y%rcfg_cloudsat%kr_scaled)
+    if (allocated(y%rcfg_cloudsat%fc))                 deallocate(y%rcfg_cloudsat%fc)
+    if (allocated(y%rcfg_cloudsat%rho_eff))            deallocate(y%rcfg_cloudsat%rho_eff)
+    if (allocated(y%rcfg_cloudsat%base_list))          deallocate(y%rcfg_cloudsat%base_list)
+    if (allocated(y%rcfg_cloudsat%step_list))          deallocate(y%rcfg_cloudsat%step_list)
   end subroutine destroy_cospIN
   !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   ! SUBROUTINE destroy_cospstateIN     
@@ -3285,6 +3364,14 @@ CONTAINS
      if (associated(y%modis_Optical_thickness_vs_ReffICE))                   then
         deallocate(y%modis_Optical_thickness_vs_ReffICE)
         nullify(y%modis_Optical_thickness_vs_ReffICE)
+     endif
+     if (associated(y%cfodd_ntotal)) then
+        deallocate(y%cfodd_ntotal)
+        nullify(y%cfodd_ntotal)
+     endif
+     if (associated(y%wr_occfreq_ntotal)) then
+        deallocate(y%wr_occfreq_ntotal)
+        nullify(y%wr_occfreq_ntotal)
      endif
      if (associated(y%calipso_cldtype)) then
         deallocate(y%calipso_cldtype)
