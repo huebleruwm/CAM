@@ -271,7 +271,6 @@ subroutine vertical_diffusion_init(pbuf2d)
   use vertical_diffusion_sponge_layer, only: vertical_diffusion_sponge_layer_init
 
   use holtslag_boville_diff_interstitials, only: hb_diff_set_vertical_diffusion_top_init
-  use holtslag_boville_diff_interstitials, only: hb_diff_set_vertical_diffusion_top_waccmx_init
 
   use molec_diff,        only : init_molec_diff
   use diffusion_solver_cam, only : init_vdiff
@@ -360,11 +359,7 @@ subroutine vertical_diffusion_init(pbuf2d)
 
   ! ntop_eddy must be 1 or <= nbot_molec
   ! Currently, it is always 1 except for WACCM-X.
-  if ( waccmx_mode ) then
-     call hb_diff_set_vertical_diffusion_top_waccmx_init(ntop_eddy=ntop_eddy, errmsg=errmsg, errflg=errflg)
-  else
-     call hb_diff_set_vertical_diffusion_top_init(ntop_eddy=ntop_eddy, errmsg=errmsg, errflg=errflg)
-  end if
+  call hb_diff_set_vertical_diffusion_top_init(ntop_eddy=ntop_eddy, errmsg=errmsg, errflg=errflg)
   nbot_eddy  = pver
 
   if (masterproc) write(iulog, fmt='(a,i3,5x,a,i3)') 'NTOP_EDDY  =', ntop_eddy, 'NBOT_EDDY  =', nbot_eddy
