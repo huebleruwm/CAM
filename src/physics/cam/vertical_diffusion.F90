@@ -1034,14 +1034,14 @@ subroutine vertical_diffusion_tend( &
           pverp             = pverp,                      &
           pcnst             = pcnst,                      &
           const_props       = ccpp_const_props,           &
-          flag_for_cflux    = cam_physpkg_is("cam7"),     & ! does vertical diffusion apply ANY fluxes?
+          apply_nonwv_cflx  = (.not. cam_physpkg_is("cam7")), & ! does vertical diffusion apply ANY fluxes?
           cflx_from_coupler = cam_in%cflx(:ncol,:pcnst),  &
           pint              = state%pint(:ncol,:pverp),   &
           ! below output
           taux              = taux(:ncol),                & ! these are zero since handled by CLUBB.
           tauy              = tauy(:ncol),                & ! these are zero since handled by CLUBB.
           shflux            = shflux(:ncol),              & ! these are zero since handled by CLUBB.
-          cflux             = cflux(:ncol,:pcnst),        & ! if flag_for_cflux, contains non-wv. fluxes, otherwise 0
+          cflux             = cflux(:ncol,:pcnst),        & ! if apply_nonwv_cflx, contains non-wv. fluxes, otherwise 0
           itaures           = itaures,                    &
           p                 = p,                          &
           q_wv_cflx         = q_wv_cflx(:ncol),           & ! for use in HB for kinematic water vapor flux calc.
