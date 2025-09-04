@@ -33,11 +33,14 @@ module cospsimulator_intr
        nCloudsatPrecipClass, CFODD_NDBZE, CFODD_NICOD, CFODD_BNDRE, CFODD_NCLASS,      &
        CFODD_DBZE_MIN, CFODD_DBZE_MAX, CFODD_ICOD_MIN, CFODD_ICOD_MAX,                 &
        CFODD_DBZE_WIDTH, CFODD_ICOD_WIDTH, WR_NREGIME, CFODD_HISTDBZE,                 &
-       CFODD_HISTDBZEcenters, CFODD_HISTICOD, CFODD_HISTICODcenters,                   &
+       CFODD_HISTDBZEcenters, CFODD_HISTICOD, CFODD_HISTICODcenters,LWP_binBounds,     &
+       IWP_binBounds,LWP_binEdges,IWP_binEdges,LWP_binCenters,IWP_binCenters,          &
        nsza_cosp         => PARASOL_NREFL,       &
        nprs_cosp         => npres,               &
        ntau_cosp         => ntau,                &
        ntau_cosp_modis   => ntau,                &
+       nlwp_cosp_modis   => nLWP,                &
+       niwp_cosp_modis   => nIWP,                &
        nsr_cosp          => SR_BINS,             &
        nhtmisr_cosp      => numMISRHgtBins,      &
        nhydro            => N_HYDRO, &
@@ -98,6 +101,10 @@ module cospsimulator_intr
   real(r8), target :: reffLIQ_binEdges_cosp(2,numMODISReffLiqBins)
   real(r8), target :: reffICE_binCenters_cosp(numMODISReffIceBins)
   real(r8), target :: reffLIQ_binCenters_cosp(numMODISReffLiqBins)
+  real(r8), target :: LWP_binEdges_cosp(2,nlwp_cosp_modis)
+  real(r8), target :: IWP_binEdges_cosp(2,niwp_cosp_modis)
+  real(r8), target :: LWP_binCenters_cosp(nlwp_cosp_modis)
+  real(r8), target :: IWP_binCenters_cosp(niwp_cosp_modis)   
 
   integer  :: prstau_cosp(nprs_cosp*ntau_cosp)             ! ISCCP mixed output dimension index
   integer  :: prstau_cosp_modis(nprs_cosp*ntau_cosp_modis) ! MODIS mixed output dimension index
@@ -516,9 +523,14 @@ CONTAINS
             bounds_name='cosp_reffice_bnds',bounds=reffICE_binEdges_cosp)
        call add_hist_coord('cosp_reffliq',numMODISReffLiqBins,                 &
             'COSP Mean MODIS effective radius (liquid)', 'microns', reffLIQ_binCenters_cosp, &
-            bounds_name='cosp_reffliq_bnds',bounds=reffLIQ_binEdges_cosp)      
+            bounds_name='cosp_reffliq_bnds',bounds=reffLIQ_binEdges_cosp)
+       call add_hist_coord('cosp_lwp_modis',nlwp_cosp_modis,                              &
+            'COSP MODIS liquid water path', 'kg m-2', LWP_binCenters_cosp,     &
+            bounds_name='cosp_lwp_modis_bnds',bounds=LWP_binEdges_cosp)
+       call add_hist_coord('cosp_iwp_modis',niwp_cosp_modis,                              &
+            'COSP MODIS ice water path', 'kg m-2', IWP_binCenters_cosp,        &
+            bounds_name='cosp_iwp_modis_bnds',bounds=IWP_binEdges_cosp)
     end if
-    
 #endif
   end subroutine cospsimulator_intr_register
   
@@ -794,7 +806,10 @@ CONTAINS
             'MODIS Cloud Area Fraction (tau-reffice histogram)', flag_xyfill=.true., fill_value=R_UNDEF)
        call addfld('CLRLMODIS', (/'cosp_tau_modis','cosp_reffliq  '/), 'A', '%', &
             'MODIS Cloud Area Fraction (tau-reffliq histogram)', flag_xyfill=.true., fill_value=R_UNDEF)
-       
+       call addfld('LWP_REFFCLW_MODIS', (/'cosp_lwp_modis','cosp_reffliq  '/), 'A', '%', &
+            'MODIS Cloud Area Fraction (lwp-reffclw histogram)', flag_xyfill=.true., fill_value=R_UNDEF)
+       call addfld('IWP_REFFCLI_MODIS', (/'cosp_iwp_modis','cosp_reffice  '/), 'A', '%', &
+            'MODIS Cloud Area Fraction (iwp-reffcli histogram)', flag_xyfill=.true., fill_value=R_UNDEF)
        call add_default('CLTMODIS',cosp_histfile_num,' ')
        call add_default('CLWMODIS',cosp_histfile_num,' ')
        call add_default('CLIMODIS',cosp_histfile_num,' ')
@@ -815,6 +830,8 @@ CONTAINS
        call add_default('CLMODIS',cosp_histfile_num,' ')
        call add_default('CLRIMODIS',cosp_histfile_num,' ')
        call add_default('CLRLMODIS',cosp_histfile_num,' ')
+       call add_default('LWP_REFFCLW_MODIS',cosp_histfile_num,' ')
+       call add_default('IWP_REFFCLI_MODIS',cosp_histfile_num,' ')
     end if
     
     ! SUB-COLUMN OUTPUT
@@ -952,6 +969,10 @@ CONTAINS
     reffICE_binEdges_cosp   = reffICE_binEdges
     reffLIQ_binCenters_cosp = reffLIQ_binCenters
     reffLIQ_binEdges_cosp   = reffLIQ_binEdges
+    LWP_binEdges_cosp       = LWP_binEdges
+    IWP_binEdges_cosp       = IWP_binEdges
+    LWP_binCenters_cosp     = LWP_binCenters
+    IWP_binCenters_cosp     = IWP_binCenters
                                   
     ! Initialize the distributional parameters for hydrometeors in radar simulator. In COSPv1.4, this was declared in
     ! cosp_defs.f.
@@ -1169,7 +1190,7 @@ CONTAINS
     integer, parameter :: nf_calipso=28                  ! number of calipso outputs
     integer, parameter :: nf_isccp=9                     ! number of isccp outputs
     integer, parameter :: nf_misr=1                      ! number of misr outputs
-    integer, parameter :: nf_modis=20                    ! number of modis outputs
+    integer, parameter :: nf_modis=22                    ! number of modis outputs
     
     ! Cloudsat outputs
     character(len=max_fieldname_len),dimension(nf_radar),parameter ::          &
@@ -1204,7 +1225,7 @@ CONTAINS
                        'CLLMODIS    ','TAUTMODIS   ','TAUWMODIS   ','TAUIMODIS   ','TAUTLOGMODIS',&
                        'TAUWLOGMODIS','TAUILOGMODIS','REFFCLWMODIS','REFFCLIMODIS',&
                        'PCTMODIS    ','LWPMODIS    ','IWPMODIS    ','CLMODIS     ','CLRIMODIS   ',&
-                       'CLRLMODIS   '/)
+                       'CLRLMODIS   ','LWP_REFFCLW_MODIS          ','IWP_REFFCLI_MODIS'/)
     
     logical :: run_radar(nf_radar,pcols)                 ! logical telling you if you should run radar simulator
     logical :: run_calipso(nf_calipso,pcols)             ! logical telling you if you should run calipso simulator
@@ -1334,6 +1355,8 @@ CONTAINS
     real(r8) :: clrimodis(pcols,ntau_cosp,numMODISReffIceBins)
     real(r8) :: clrlmodis_cam(pcols,ntau_cosp*numMODISReffLiqBins)
     real(r8) :: clrlmodis(pcols,ntau_cosp,numMODISReffLiqBins)
+    real(r8) :: lwp_reffliq_modis(pcols,nlwp_cosp_modis,numMODISReffLiqBins)
+    real(r8) :: iwp_reffice_modis(pcols,niwp_cosp_modis,numMODISReffIceBins)
     real(r8), dimension(pcols,nlay*nscol_cosp) :: &
        tau067_out, emis11_out, fracliq_out, asym34_out, ssa34_out
 
@@ -1448,6 +1471,8 @@ CONTAINS
     clrimodis(1:pcols,1:ntau_cosp_modis,1:numMODISReffIceBins)   = R_UNDEF ! +cosp2
     clrlmodis_cam(1:pcols,1:ntau_cosp_modis*numMODISReffLiqBins) = R_UNDEF ! +cosp2
     clrlmodis(1:pcols,1:ntau_cosp_modis,1:numMODISReffLiqBins)   = R_UNDEF ! +cosp2
+    lwp_reffliq_modis(1:pcols,1:nlwp_cosp_modis,1:numMODISReffLiqBins) = R_UNDEF
+    iwp_reffice_modis(1:pcols,1:niwp_cosp_modis,1:numMODISReffIceBins) = R_UNDEF
     tau067_out(1:pcols,1:nlay*nscol_cosp)            = R_UNDEF ! +cosp2
     emis11_out(1:pcols,1:nlay*nscol_cosp)            = R_UNDEF ! +cosp2
     asym34_out(1:pcols,1:nlay*nscol_cosp)            = R_UNDEF ! +cosp2
@@ -1905,6 +1930,20 @@ CONTAINS
                 end where
              enddo
           enddo
+          do i=1,nlwp_cosp_modis
+             do k=1,numMODISReffLiqBins
+                where(cam_sunlit(1:ncol) .eq. 0)
+                   cospOUT%modis_LWP_vs_ReffLIQ(1:ncol,i,k) = R_UNDEF
+                end where
+             enddo
+          enddo
+          do i=1,niwp_cosp_modis
+             do k=1,numMODISReffIceBins
+                where(cam_sunlit(1:ncol) .eq. 0)
+                   cospOUT%modis_IWP_vs_ReffICE(1:ncol,i,k) = R_UNDEF
+                end where
+             enddo
+          enddo
        end if
     end if
     call t_stopf("sunlit_passive")
@@ -2021,6 +2060,8 @@ CONTAINS
        clmodis(1:ncol,1:ntau_cosp_modis,1:nprs_cosp)  = cospOUT%modis_Optical_Thickness_vs_Cloud_Top_Pressure 
        clrimodis(1:ncol,1:ntau_cosp_modis,1:numMODISReffIceBins) = cospOUT%modis_Optical_Thickness_vs_ReffICE
        clrlmodis(1:ncol,1:ntau_cosp_modis,1:numMODISReffLiqBins) = cospOUT%modis_Optical_Thickness_vs_ReffLIQ
+       lwp_reffliq_modis(1:ncol,1:nlwp_cosp_modis,1:numMODISReffLiqBins) = cospOUT%modis_LWP_vs_ReffLIQ
+       iwp_reffice_modis(1:ncol,1:niwp_cosp_modis,1:numMODISReffIceBins) = cospOUT%modis_IWP_vs_ReffICE
     endif
     
     ! Use COSP output to populate CAM collapsed output variables
@@ -2358,7 +2399,9 @@ CONTAINS
        
        call outfld('CLMODIS',clmodis_cam  ,pcols,lchnk) 
        call outfld('CLRIMODIS',clrimodis_cam  ,pcols,lchnk) 
-       call outfld('CLRLMODIS',clrlmodis_cam  ,pcols,lchnk) 
+       call outfld('CLRLMODIS',clrlmodis_cam  ,pcols,lchnk)
+       call outfld('LWP_REFFCLW_MODIS',lwp_reffliq_modis,pcols,lchnk)
+       call outfld('IWP_REFFCLI_MODIS',iwp_reffice_modis,pcols,lchnk)
     end if
     
     ! SUB-COLUMN OUTPUT
@@ -3020,6 +3063,8 @@ CONTAINS
           x%modis_Optical_Thickness_vs_Cloud_Top_Pressure(nPoints,numModisTauBins,numMODISPresBins), &
           x%modis_Optical_thickness_vs_ReffLIQ(nPoints,numMODISTauBins,numMODISReffLiqBins), &   
           x%modis_Optical_Thickness_vs_ReffICE(nPoints,numMODISTauBins,numMODISReffIceBins), &
+          x%modis_LWP_vs_ReffLIQ(nPoints,nlwp_cosp_modis,numMODISReffLiqBins), &
+          x%modis_IWP_vs_ReffICE(nPoints,niwp_cosp_modis,numMODISReffIceBins), &
           stat=istat)
        call handle_allocate_error(istat, sub, 'modis_*')
     endif
@@ -3364,6 +3409,14 @@ CONTAINS
      if (associated(y%modis_Optical_thickness_vs_ReffICE))                   then
         deallocate(y%modis_Optical_thickness_vs_ReffICE)
         nullify(y%modis_Optical_thickness_vs_ReffICE)
+     endif
+     if (associated(y%modis_LWP_vs_ReffLIQ))                                 then
+        deallocate(y%modis_LWP_vs_ReffLIQ) 
+        nullify(y%modis_LWP_vs_ReffLIQ)     
+     endif
+     if (associated(y%modis_IWP_vs_ReffICE))                                 then
+        deallocate(y%modis_IWP_vs_ReffICE) 
+        nullify(y%modis_IWP_vs_ReffICE)     
      endif
      if (associated(y%cfodd_ntotal)) then
         deallocate(y%cfodd_ntotal)
