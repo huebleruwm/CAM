@@ -33,7 +33,7 @@ module cospsimulator_intr
        nCloudsatPrecipClass, CFODD_NDBZE, CFODD_NICOD, CFODD_BNDRE, CFODD_NCLASS,      &
        CFODD_DBZE_MIN, CFODD_DBZE_MAX, CFODD_ICOD_MIN, CFODD_ICOD_MAX,                 &
        CFODD_DBZE_WIDTH, CFODD_ICOD_WIDTH, WR_NREGIME, CFODD_HISTDBZE,                 &
-       CFODD_HISTDBZEcenters, CFODD_HISTICOD, CFODD_HISTICODcenters, 
+       CFODD_HISTDBZEcenters, CFODD_HISTICOD, CFODD_HISTICODcenters,                   &
        nsza_cosp         => PARASOL_NREFL,       &
        nprs_cosp         => npres,               &
        ntau_cosp         => ntau,                &
@@ -493,12 +493,12 @@ CONTAINS
        call add_hist_coord('cosp_dbze', CLOUDSAT_DBZE_BINS,                    &
             'COSP Mean dBZe for radar simulator CFAD output', 'dBZ',           &
             dbzemid_cosp, bounds_name='cosp_dbze_bnds', bounds=dbzelim_cosp)
-       call add_hist_coord('cosp_cfodd_dbze', CFODD_HISTDBZEcenters                   &
-            'COSP Mean dBZe for radar simulator CFODD output', 'dBZ',                 &
-       )
-       call add_hist_coord('cosp_cfodd_icod', CFODD_HISTICODcenters,                  &
+       call add_hist_coord('cosp_cfodd_dbze', CFODD_NDBZE,                     &
+            'COSP Mean dBZe for radar simulator CFODD output', 'dBZ',          &
+            CFODD_HISTDBZEcenters)
+       call add_hist_coord('cosp_cfodd_icod', CFODD_NICOD,                            &
             'COSP Mean in-cloud optical depth for radar simulator CFODD output', '1', &
-       )
+            CFODD_HISTICODcenters)
     end if
     
     if (lmisr_sim) then
@@ -1941,9 +1941,9 @@ CONTAINS
        cloudsatpia(1:ncol)     = cospOUT%cloudsat_pia
 
        ! CloudSat warm rain diagnostics
-       wr_ocfreq_noprecip_cs(1:ncol,1:WR_NREGIME)                 = cospOUT%wr_ocfreq(:,1)
-       wr_ocfreq_drizzle_cs(1:ncol,1:WR_NREGIME)                  = cospOUT%wr_ocfreq(:,2)
-       wr_ocfreq_precip_cs(1:ncol,1:WR_NREGIME)                   = cospOUT%wr_ocfreq(:,3)
+       wr_ocfreq_noprecip_cs(1:ncol)                              = cospOUT%wr_occfreq_ntotal(:,1)
+       wr_ocfreq_drizzle_cs(1:ncol)                               = cospOUT%wr_occfreq_ntotal(:,2)
+       wr_ocfreq_precip_cs(1:ncol)                                = cospOUT%wr_occfreq_ntotal(:,3)
        cfodd_ntotal_small_cs(1:ncol,1:CFODD_NDBZE,1:CFODD_NICOD)  = cospOUT%cfodd_ntotal(:,:,:,1)
        cfodd_ntotal_medium_cs(1:ncol,1:CFODD_NDBZE,1:CFODD_NICOD) = cospOUT%cfodd_ntotal(:,:,:,2)
        cfodd_ntotal_large_cs(1:ncol,1:CFODD_NDBZE,1:CFODD_NICOD)  = cospOUT%cfodd_ntotal(:,:,:,3)
@@ -3053,11 +3053,11 @@ CONTAINS
     ! Cloudsat simulator
     if (lradar_sim) then
        allocate( &
-          x%cloudsat_Ze_tot(Npoints,Ncolumns,Nlevels), &
-          x%cloudsat_cfad_ze(Npoints,CLOUDSAT_DBZE_BINS,Nlvgrid), &
-          x%lidar_only_freq_cloud(Npoints,Nlvgrid), &
-          x%radar_lidar_tcc(Npoints), &
-          x%wr_ocfreq(Npoints,WR_NREGIME),
+          x%cloudsat_Ze_tot(Npoints,Ncolumns,Nlevels),                  &
+          x%cloudsat_cfad_ze(Npoints,CLOUDSAT_DBZE_BINS,Nlvgrid),       &
+          x%lidar_only_freq_cloud(Npoints,Nlvgrid),                     &
+          x%radar_lidar_tcc(Npoints),                                   &
+          x%wr_occfreq_ntotal(Npoints,WR_NREGIME),                      &
           x%cfodd_ntotal(Npoints,CFODD_NDBZE,CFODD_NICOD,CFODD_NCLASS), &
           stat=istat)
        call handle_allocate_error(istat, sub, 'cloudsat*')
