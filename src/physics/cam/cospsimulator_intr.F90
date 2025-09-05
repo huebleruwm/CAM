@@ -464,7 +464,7 @@ CONTAINS
     ! Define coordinate variables for COSP outputs.
     if (lisccp_sim .or. lmodis_sim) then
        call add_hist_coord('cosp_prs', nprs_cosp, 'COSP Mean ISCCP pressure',  &
-            'hPa', prsmid_cosp, bounds_name='cosp_prs_bnds', bounds=prslim_cosp)
+            'Pa', prsmid_cosp, bounds_name='cosp_prs_bnds', bounds=prslim_cosp)
     end if
     
     if (lisccp_sim .or. lmisr_sim) then
@@ -519,10 +519,10 @@ CONTAINS
             'COSP Mean MODIS optical depth', '1', taumid_cosp_modis,           &
             bounds_name='cosp_tau_modis_bnds', bounds=taulim_cosp_modis)
        call add_hist_coord('cosp_reffice',numMODISReffIceBins,                 &
-            'COSP Mean MODIS effective radius (ice)', 'microns', reffICE_binCenters_cosp, &
+            'COSP Mean MODIS effective radius (ice)', 'm', reffICE_binCenters_cosp, &
             bounds_name='cosp_reffice_bnds',bounds=reffICE_binEdges_cosp)
        call add_hist_coord('cosp_reffliq',numMODISReffLiqBins,                 &
-            'COSP Mean MODIS effective radius (liquid)', 'microns', reffLIQ_binCenters_cosp, &
+            'COSP Mean MODIS effective radius (liquid)', 'm', reffLIQ_binCenters_cosp, &
             bounds_name='cosp_reffliq_bnds',bounds=reffLIQ_binEdges_cosp)
        call add_hist_coord('cosp_lwp_modis',nlwp_cosp_modis,                              &
             'COSP MODIS liquid water path', 'kg m-2', LWP_binCenters_cosp,     &
