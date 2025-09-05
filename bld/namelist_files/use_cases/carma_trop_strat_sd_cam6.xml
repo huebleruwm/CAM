@@ -25,7 +25,7 @@
 <bnd_topo hgrid="1.9x2.5">atm/cam/met/MERRA2/1.9x2.5/fv_1.9x2.5_nc3000_Nsw084_Nrs016_Co120_Fi001_ZR_GRNL_MERRA2_c190617.nc</bnd_topo>
 
 <!-- Solar data -->
-<solar_irrad_data_file>atm/cam/solar/SolarForcingCMIP6_18491230-230000102_c20200615.nc</solar_irrad_data_file>
+<solar_irrad_data_file>atm/cam/solar/SolarForcingCMIP6_18491230-23000102_c20200615.nc</solar_irrad_data_file>
 
 <!-- External forcing -->
 <ext_frc_type>INTERP_MISSING_MONTHS</ext_frc_type>
