@@ -1322,8 +1322,7 @@ subroutine radiation_tend( &
                !$acc        copy(atm_optics_lw%optical_props, atm_optics_lw%optical_props%tau,                &
                !$acc             sources_lw%sources, sources_lw%sources%lay_source,                  &
                !$acc             sources_lw%sources%sfc_source,                  &
-               !$acc             sources_lw%sources%lev_source_inc,              &
-               !$acc             sources_lw%sources%lev_source_dec,              &
+               !$acc             sources_lw%sources%lev_source,                  &
                !$acc             sources_lw%sources%sfc_source_jac)
                call rrtmgp_lw_gas_optics_run(dolw, 1, ncol, ncol, pmid_rad, pint_rad, t_rad,  &
                   t_sfc, gas_concs_lw, atm_optics_lw, sources_lw, t_rad, .false., kdist_lw, errmsg, &
@@ -1342,8 +1341,7 @@ subroutine radiation_tend( &
                !$acc             cloud_lw%optical_props, cloud_lw%optical_props%tau,        &
                !$acc             sources_lw%sources,sources_lw%sources%lay_source,     &
                !$acc             sources_lw%sources%sfc_source,     &
-               !$acc             sources_lw%sources%lev_source_inc, &
-               !$acc             sources_lw%sources%lev_source_dec, &
+               !$acc             sources_lw%sources%lev_source,     &
                !$acc             sources_lw%sources%sfc_source_jac, &
                !$acc             emis_sfc)                          &
                !$acc        copy(flwc%fluxes, flwc%fluxes%flux_net, flwc%fluxes%flux_up, &
