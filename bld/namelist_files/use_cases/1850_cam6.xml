@@ -4,7 +4,7 @@
   <ncdata hgrid="1.9x2.5" nlev="32">cesm2_init/b.e20.B1850.f19_g17.release_cesm2_1_0.020/0301-01-01/b.e20.B1850.f19_g17.release_cesm2_1_0.020.cam.i.0301-01-01-00000.nc</ncdata>
 
 <!-- Solar constant -->
-  <solar_irrad_data_file     >   'atm/cam/solar/SolarForcingCMIP7piControl_c20250103.nc'   </solar_irrad_data_file>
+  <solar_irrad_data_file     >   'atm/cam/solar/SolarForcingCMIP6piControl_c160921.nc'   </solar_irrad_data_file>
   <solar_data_ymd      >   18500101                                                </solar_data_ymd>
   <solar_data_type     >    FIXED                                                  </solar_data_type>
 
