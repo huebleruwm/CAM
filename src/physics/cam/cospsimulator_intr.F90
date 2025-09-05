@@ -802,6 +802,10 @@ CONTAINS
             'MODIS Cloud Ice Water Path*CLIMODIS', flag_xyfill=.true., fill_value=R_UNDEF)
        call addfld('CLMODIS', (/'cosp_tau_modis','cosp_prs      '/), 'A', '%', &
             'MODIS Cloud Area Fraction (tau-pressure histogram)', flag_xyfill=.true., fill_value=R_UNDEF)
+       call addfld('CLMODIS_LIQ', (/'cosp_tau_modis','cosp_prs  '/), 'A', '%', &
+            'MODIS Liquid Cloud Area Fraction (tau-pressure histogram)', flag_xyfill=.true., fill_value=R_UNDEF)
+       call addfld('CLMODIS_ICE', (/'cosp_tau_modis','cosp_prs  '/), 'A', '%', &
+            'MODIS Ice Cloud Area Fraction (tau-pressure histogram)', flag_xyfill=.true., fill_value=R_UNDEF)
        call addfld('CLRIMODIS', (/'cosp_tau_modis','cosp_reffice  '/), 'A', '%', &
             'MODIS Cloud Area Fraction (tau-reffice histogram)', flag_xyfill=.true., fill_value=R_UNDEF)
        call addfld('CLRLMODIS', (/'cosp_tau_modis','cosp_reffliq  '/), 'A', '%', &
@@ -828,6 +832,8 @@ CONTAINS
        call add_default('LWPMODIS',cosp_histfile_num,' ')
        call add_default('IWPMODIS',cosp_histfile_num,' ')
        call add_default('CLMODIS',cosp_histfile_num,' ')
+       call add_default('CLMODIS_LIQ',cosp_histfile_num,' ')
+       call add_default('CLMODIS_ICE',cosp_histfile_num,' ')
        call add_default('CLRIMODIS',cosp_histfile_num,' ')
        call add_default('CLRLMODIS',cosp_histfile_num,' ')
        call add_default('LWP_REFFCLW_MODIS',cosp_histfile_num,' ')
@@ -1190,7 +1196,7 @@ CONTAINS
     integer, parameter :: nf_calipso=28                  ! number of calipso outputs
     integer, parameter :: nf_isccp=9                     ! number of isccp outputs
     integer, parameter :: nf_misr=1                      ! number of misr outputs
-    integer, parameter :: nf_modis=22                    ! number of modis outputs
+    integer, parameter :: nf_modis=24                    ! number of modis outputs
     
     ! Cloudsat outputs
     character(len=max_fieldname_len),dimension(nf_radar),parameter ::          &
@@ -1225,7 +1231,8 @@ CONTAINS
                        'CLLMODIS    ','TAUTMODIS   ','TAUWMODIS   ','TAUIMODIS   ','TAUTLOGMODIS',&
                        'TAUWLOGMODIS','TAUILOGMODIS','REFFCLWMODIS','REFFCLIMODIS',&
                        'PCTMODIS    ','LWPMODIS    ','IWPMODIS    ','CLMODIS     ','CLRIMODIS   ',&
-                       'CLRLMODIS   ','LWP_REFFCLW_MODIS          ','IWP_REFFCLI_MODIS'/)
+                       'CLRLMODIS   ','CLMODIS_LIQ ','CLMODIS_ICE ','LWP_REFFCLW_MODIS          ',&
+                       'IWP_REFFCLI_MODIS'/)
     
     logical :: run_radar(nf_radar,pcols)                 ! logical telling you if you should run radar simulator
     logical :: run_calipso(nf_calipso,pcols)             ! logical telling you if you should run calipso simulator
@@ -1351,6 +1358,8 @@ CONTAINS
     real(r8) :: iwpmodis(pcols)
     real(r8) :: clmodis_cam(pcols,ntau_cosp_modis*nprs_cosp)
     real(r8) :: clmodis(pcols,ntau_cosp_modis,nprs_cosp)
+    real(r8) :: clmodis_liq(pcols,ntau_cosp_modis,nprs_cosp) ! JKS Not sure if I need to duplicate clmodis here.
+    real(r8) :: clmodis_ice(pcols,ntau_cosp_modis,nprs_cosp)
     real(r8) :: clrimodis_cam(pcols,ntau_cosp*numMODISReffIceBins)
     real(r8) :: clrimodis(pcols,ntau_cosp,numMODISReffIceBins)
     real(r8) :: clrlmodis_cam(pcols,ntau_cosp*numMODISReffLiqBins)
@@ -1467,6 +1476,8 @@ CONTAINS
     iwpmodis(1:pcols)                                = R_UNDEF
     clmodis_cam(1:pcols,1:ntau_cosp_modis*nprs_cosp) = R_UNDEF
     clmodis(1:pcols,1:ntau_cosp_modis,1:nprs_cosp)   = R_UNDEF
+    clmodis_liq(1:pcols,1:ntau_cosp_modis,1:nprs_cosp)           = R_UNDEF
+    clmodis_ice(1:pcols,1:ntau_cosp_modis,1:nprs_cosp)           = R_UNDEF
     clrimodis_cam(1:pcols,1:ntau_cosp_modis*numMODISReffIceBins) = R_UNDEF ! +cosp2
     clrimodis(1:pcols,1:ntau_cosp_modis,1:numMODISReffIceBins)   = R_UNDEF ! +cosp2
     clrlmodis_cam(1:pcols,1:ntau_cosp_modis*numMODISReffLiqBins) = R_UNDEF ! +cosp2
@@ -1917,6 +1928,8 @@ CONTAINS
              do k=1,nprs_cosp
                 where(cam_sunlit(1:ncol) .eq. 0)
                    cospOUT%modis_Optical_Thickness_vs_Cloud_Top_Pressure(1:ncol,i,k) = R_UNDEF 
+                   cospOUT%modis_Optical_Thickness_vs_Cloud_Top_Pressure_Liq(1:ncol,i,k) = R_UNDEF 
+                   cospOUT%modis_Optical_Thickness_vs_Cloud_Top_Pressure_Ice(1:ncol,i,k) = R_UNDEF 
                 end where
              enddo
              do k=1,numMODISReffIceBins
@@ -2057,7 +2070,9 @@ CONTAINS
        pctmodis(1:ncol)     = cospOUT%modis_Cloud_Top_Pressure_Total_Mean
        lwpmodis(1:ncol)     = cospOUT%modis_Liquid_Water_Path_Mean
        iwpmodis(1:ncol)     = cospOUT%modis_Ice_Water_Path_Mean
-       clmodis(1:ncol,1:ntau_cosp_modis,1:nprs_cosp)  = cospOUT%modis_Optical_Thickness_vs_Cloud_Top_Pressure 
+       clmodis(1:ncol,1:ntau_cosp_modis,1:nprs_cosp)  = cospOUT%modis_Optical_Thickness_vs_Cloud_Top_Pressure
+       clmodis_liq(1:ncol,1:ntau_cosp_modis,1:nprs_cosp)  = cospOUT%modis_Optical_Thickness_vs_Cloud_Top_Pressure_Liq
+       clmodis_ice(1:ncol,1:ntau_cosp_modis,1:nprs_cosp)  = cospOUT%modis_Optical_Thickness_vs_Cloud_Top_Pressure_Ice
        clrimodis(1:ncol,1:ntau_cosp_modis,1:numMODISReffIceBins) = cospOUT%modis_Optical_Thickness_vs_ReffICE
        clrlmodis(1:ncol,1:ntau_cosp_modis,1:numMODISReffLiqBins) = cospOUT%modis_Optical_Thickness_vs_ReffLIQ
        lwp_reffliq_modis(1:ncol,1:nlwp_cosp_modis,1:numMODISReffLiqBins) = cospOUT%modis_LWP_vs_ReffLIQ
@@ -2397,8 +2412,10 @@ CONTAINS
        end where
        call outfld('IWPMODIS',iwpmodis    ,pcols,lchnk)
        
-       call outfld('CLMODIS',clmodis_cam  ,pcols,lchnk) 
-       call outfld('CLRIMODIS',clrimodis_cam  ,pcols,lchnk) 
+       call outfld('CLMODIS',clmodis_cam  ,pcols,lchnk)
+       call outfld('CLMODIS_LIQ',clmodis_liq  ,pcols,lchnk)
+       call outfld('CLMODIS_ICE',clmodis_ice  ,pcols,lchnk)
+       call outfld('CLRIMODIS',clrimodis_cam  ,pcols,lchnk)
        call outfld('CLRLMODIS',clrlmodis_cam  ,pcols,lchnk)
        call outfld('LWP_REFFCLW_MODIS',lwp_reffliq_modis,pcols,lchnk)
        call outfld('IWP_REFFCLI_MODIS',iwp_reffice_modis,pcols,lchnk)
@@ -3061,6 +3078,8 @@ CONTAINS
           x%modis_Liquid_Water_Path_Mean(Npoints), &
           x%modis_Ice_Water_Path_Mean(Npoints), &
           x%modis_Optical_Thickness_vs_Cloud_Top_Pressure(nPoints,numModisTauBins,numMODISPresBins), &
+          x%modis_Optical_Thickness_vs_Cloud_Top_Pressure_Liq(nPoints,numModisTauBins,numMODISPresBins), &
+          x%modis_Optical_Thickness_vs_Cloud_Top_Pressure_Ice(nPoints,numModisTauBins,numMODISPresBins), &
           x%modis_Optical_thickness_vs_ReffLIQ(nPoints,numMODISTauBins,numMODISReffLiqBins), &   
           x%modis_Optical_Thickness_vs_ReffICE(nPoints,numMODISTauBins,numMODISReffIceBins), &
           x%modis_LWP_vs_ReffLIQ(nPoints,nlwp_cosp_modis,numMODISReffLiqBins), &
@@ -3401,6 +3420,14 @@ CONTAINS
      if (associated(y%modis_Optical_Thickness_vs_Cloud_Top_Pressure))        then
         deallocate(y%modis_Optical_Thickness_vs_Cloud_Top_Pressure)     
         nullify(y%modis_Optical_Thickness_vs_Cloud_Top_Pressure)     
+     endif
+     if (associated(y%modis_Optical_Thickness_vs_Cloud_Top_Pressure_Liq))        then
+        deallocate(y%modis_Optical_Thickness_vs_Cloud_Top_Pressure_Liq)
+        nullify(y%modis_Optical_Thickness_vs_Cloud_Top_Pressure_Liq)
+     endif
+     if (associated(y%modis_Optical_Thickness_vs_Cloud_Top_Pressure_Ice))        then
+        deallocate(y%modis_Optical_Thickness_vs_Cloud_Top_Pressure_Ice)
+        nullify(y%modis_Optical_Thickness_vs_Cloud_Top_Pressure_Ice)
      endif
      if (associated(y%modis_Optical_thickness_vs_ReffLIQ))                   then
         deallocate(y%modis_Optical_thickness_vs_ReffLIQ)
