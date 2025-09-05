@@ -28,8 +28,8 @@
 
 [submodule "atmos_phys"]
 	path = src/atmos_phys
-	url = https://github.com/ESCOMP/atmospheric_physics
-        fxtag = atmos_phys0_16_001
+	url = https://github.com/peverwhee/atmospheric_physics
+        fxtag = 621f46c1378141bc2d403af693b6c04d2f862dcf
         fxrequired = AlwaysRequired
 	fxDONOTUSEurl = https://github.com/ESCOMP/atmospheric_physics
 
@@ -80,7 +80,7 @@
 	path = src/physics/rrtmgp/ext
 	url = https://github.com/earth-system-radiation/rte-rrtmgp.git
         fxrequired = AlwaysRequired
-        fxtag = v1.7
+	fxtag = v1.9.2
         fxDONOTUSEurl = https://github.com/earth-system-radiation/rte-rrtmgp.git
 
 [submodule "rrtmgp-data"]
