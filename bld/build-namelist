@@ -3373,7 +3373,7 @@ if ($cfg->get('microphys') =~ /^mg/) {
             $micro_mg_dcs = '500.D-6';
         }
         elsif ($phys eq 'cam7') {
-            $micro_mg_dcs = '500.D-6';
+            $micro_mg_dcs = '600.D-6';
         }
     }
 
