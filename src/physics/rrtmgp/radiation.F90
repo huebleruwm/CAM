@@ -1180,9 +1180,8 @@ subroutine radiation_tend( &
 
                   ! Compute the gas optics (stored in atm_optics_sw).
                   ! toa_flux is the reference solar source from RRTMGP data.
-                  !$acc data copyin(kdist_sw%gas_props,pmid_day,pint_day,t_day,gas_concs_sw%gas_concs) &
-                  !$acc        copy(atm_optics_sw%optical_props) &
-                  !$acc     copyout(toa_flux)
+                  !$acc data copyin(kdist_sw%gas_props,pmid_day,pint_day,t_day,gas_concs_sw%gas_concs,atm_optics_sw%optical_props) &
+                  !$acc      copyout(toa_flux)
                   errmsg = kdist_sw%gas_props%gas_optics( &
                      pmid_day, pint_day, t_day, gas_concs_sw%gas_concs, atm_optics_sw%optical_props, &
                      toa_flux)
@@ -1200,7 +1199,7 @@ subroutine radiation_tend( &
                ! diagnostic aerosol output.
                call rrtmgp_set_aer_sw( &
                   icall, state, pbuf, nday, idxday, nnite, idxnite, aer_sw)
-                  
+                                 
                if (nday > 0) then
 
                   ! Increment the gas optics (in atm_optics_sw) by the aerosol optics in aer_sw.
@@ -1318,8 +1317,8 @@ subroutine radiation_tend( &
 
                ! Compute the gas optics and Planck sources.
                !$acc data copyin(kdist_lw%gas_props, pmid_rad, pint_rad, t_rad,  &
-               !$acc             t_sfc, gas_concs_lw%gas_concs)                  &
-               !$acc        copy(atm_optics_lw%optical_props, atm_optics_lw%optical_props%tau,                &
+               !$acc             t_sfc, gas_concs_lw%gas_concs, atm_optics_lw%optical_props)         &
+               !$acc        copy(atm_optics_lw%optical_props%tau,                &
                !$acc             sources_lw%sources, sources_lw%sources%lay_source,                  &
                !$acc             sources_lw%sources%sfc_source,                  &
                !$acc             sources_lw%sources%lev_source,                  &
