@@ -1440,7 +1440,7 @@ subroutine radiation_tend( &
    ! of radheat_tend merges upper atmosphere heating rates with those calculated
    ! by RRTMGP.
    call radheat_tend(state, pbuf,  ptend, qrl_prime, qrs_prime, fsns, &
-                     fsnt, flns, flnt, cam_in%asdir, net_flx)
+                     fsnt, flns, flnt, cam_in%asdir, coszrs, net_flx)
 
    if (write_output) then
       ! Compute heating rate for dtheta/dt
