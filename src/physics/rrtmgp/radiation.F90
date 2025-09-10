@@ -50,6 +50,7 @@ use ccpp_optical_props,      only: ty_optical_props_1scl_ccpp, ty_optical_props_
 use ccpp_source_functions,   only: ty_source_func_lw_ccpp
 use ccpp_fluxes,             only: ty_fluxes_broadband_ccpp
 use ccpp_fluxes_byband,    only: ty_fluxes_byband_ccpp
+use mo_rte_kind,           only: wl
 
 use string_utils,        only: to_lower
 use cam_abortutils,      only: endrun, handle_allocate_error
@@ -1216,7 +1217,7 @@ subroutine radiation_tend( &
 
                   ! Compute clear-sky fluxes.
                   errmsg = rte_sw(&
-                     atm_optics_sw%optical_props, top_at_1, coszrs_day, toa_flux, &
+                     atm_optics_sw%optical_props, coszrs_day, toa_flux, &
                      alb_dir, alb_dif, fswc%fluxes)
                   call stop_on_err(errmsg, sub, 'clear-sky rte_sw')
 
@@ -1226,7 +1227,7 @@ subroutine radiation_tend( &
 
                   ! Compute all-sky fluxes.
                   errmsg = rte_sw(&
-                     atm_optics_sw%optical_props, top_at_1, coszrs_day, toa_flux, &
+                     atm_optics_sw%optical_props, coszrs_day, toa_flux, &
                      alb_dir, alb_dif, fsw%fluxes)
                   call stop_on_err(errmsg, sub, 'all-sky rte_sw')
                   !$acc end data
@@ -1321,8 +1322,7 @@ subroutine radiation_tend( &
                !$acc        copy(atm_optics_lw%optical_props, atm_optics_lw%optical_props%tau,                &
                !$acc             sources_lw%sources, sources_lw%sources%lay_source,                  &
                !$acc             sources_lw%sources%sfc_source,                  &
-               !$acc             sources_lw%sources%lev_source_inc,              &
-               !$acc             sources_lw%sources%lev_source_dec,              &
+               !$acc             sources_lw%sources%lev_source,                  &
                !$acc             sources_lw%sources%sfc_source_jac)
                call rrtmgp_lw_gas_optics_run(dolw, 1, ncol, ncol, pmid_rad, pint_rad, t_rad,  &
                   t_sfc, gas_concs_lw, atm_optics_lw, sources_lw, t_rad, .false., kdist_lw, errmsg, &
@@ -1341,8 +1341,7 @@ subroutine radiation_tend( &
                !$acc             cloud_lw%optical_props, cloud_lw%optical_props%tau,        &
                !$acc             sources_lw%sources,sources_lw%sources%lay_source,     &
                !$acc             sources_lw%sources%sfc_source,     &
-               !$acc             sources_lw%sources%lev_source_inc, &
-               !$acc             sources_lw%sources%lev_source_dec, &
+               !$acc             sources_lw%sources%lev_source,     &
                !$acc             sources_lw%sources%sfc_source_jac, &
                !$acc             emis_sfc)                          &
                !$acc        copy(flwc%fluxes, flwc%fluxes%flux_net, flwc%fluxes%flux_up, &
@@ -1351,7 +1350,7 @@ subroutine radiation_tend( &
                !$acc             lw_ds)
                call rrtmgp_lw_main_run(dolw, dolw, .false., .false., .false., &
                                  0, ncol, 1, ncol, atm_optics_lw, &
-                                 cloud_lw, top_at_1, sources_lw, emis_sfc, kdist_lw, &
+                                 cloud_lw, sources_lw, emis_sfc, kdist_lw, &
                                  aer_lw, fluxlwup_jac, lw_ds, flwc, flw, errmsg, errflg)
                if (errflg /= 0) then
                   call endrun(sub//': '//errmsg)

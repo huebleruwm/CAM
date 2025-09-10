@@ -307,7 +307,7 @@
 <bnd_topo hgrid="ne3np4"   npg="3">atm/cam/topo/se/ne3pg3_gmted2010_modis_bedmachine_nc0540_Laplace1000_noleak_20230209.nc</bnd_topo>
 <bnd_topo hgrid="ne5np4"   npg="3">atm/cam/topo/se/ne5pg3_nc3000_Co360_Fi001_MulG_PF_nullRR_Nsw064_20170516.nc</bnd_topo>
 <bnd_topo hgrid="ne16np4"  npg="3">atm/cam/topo/se/ne16pg3_gmted2010_modis_bedmachine_nc3000_Laplace0200_20230202.nc</bnd_topo>
-<bnd_topo hgrid="ne30np4"  npg="3">atm/cam/topo/se/ne30pg3_gmted2010_modis_bedmachine_nc3000_Laplace0100_noleak_20240720.nc</bnd_topo>
+<bnd_topo hgrid="ne30np4"  npg="3">atm/cam/topo/se/ne30pg3_gmted2010_modis_bedmachine_nc3000_Laplace0100_noleak_greenlndantarcsgh30fac2.50_20250828.nc</bnd_topo>
 <bnd_topo hgrid="ne60np4"  npg="3">atm/cam/topo/se/ne60pg3_nc3000_Co030_Fi001_PF_nullRR_Nsw021_20171012.nc</bnd_topo>
 <bnd_topo hgrid="ne120np4" npg="3">atm/cam/topo/se/ne120pg3_nc3000_Co015_Fi001_PF_nullRR_Nsw010_20171014.nc</bnd_topo>
 <bnd_topo hgrid="ne240np4" npg="3">atm/cam/topo/se/ne240pg3_nc3000_Co008_Fi001_PF_nullRR_Nsw005_20171015.nc</bnd_topo>
@@ -2135,7 +2135,7 @@
 <clubb_C7 phys="cam7"                             > 0.1     </clubb_C7>
 <clubb_C7b                                        > 0.5     </clubb_C7b>
 <clubb_C8                                         > 4.2     </clubb_C8>
-<clubb_C8 phys="cam7"                             > 4.5     </clubb_C8>
+<clubb_C8 phys="cam7"                             > 4.6     </clubb_C8>
 <clubb_C8b                                        > 0.0     </clubb_C8b>
 <clubb_C_invrs_tau_bkgnd                          > 1.0     </clubb_C_invrs_tau_bkgnd>
 <clubb_C_invrs_tau_sfc                            > 0.1     </clubb_C_invrs_tau_sfc>
@@ -2691,7 +2691,7 @@
 <cldfrc_dp1                                                           > 0.14D0 </cldfrc_dp1>
 <cldfrc_dp1             phys="cam5"                                   > 0.10D0 </cldfrc_dp1>
 <cldfrc_dp1             phys="cam6"                                   > 0.10D0 </cldfrc_dp1>
-<cldfrc_dp1             phys="cam7"                                   > 0.10D0 </cldfrc_dp1>
+<cldfrc_dp1             phys="cam7"                                   > 0.05D0 </cldfrc_dp1>
 <cldfrc_dp1 dyn="fv"    phys="cam4"                                   > 0.10D0 </cldfrc_dp1>
 <cldfrc_dp1 dyn="se"    phys="cam4"                                   > 0.10D0 </cldfrc_dp1>
 
