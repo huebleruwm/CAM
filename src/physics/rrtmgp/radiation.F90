@@ -1199,7 +1199,7 @@ subroutine radiation_tend( &
                ! diagnostic aerosol output.
                call rrtmgp_set_aer_sw( &
                   icall, state, pbuf, nday, idxday, nnite, idxnite, aer_sw)
-                                 
+
                if (nday > 0) then
 
                   ! Increment the gas optics (in atm_optics_sw) by the aerosol optics in aer_sw.
