@@ -652,8 +652,6 @@ subroutine vertical_diffusion_tend( &
   use camsrfexch,           only : cam_in_t
   use cam_history,          only : outfld
 
-  use trb_mtn_stress_cam,   only : trb_mtn_stress_tend
-  use beljaars_drag_cam,    only : beljaars_drag_tend, do_beljaars
   use eddy_diff_cam,        only : eddy_diff_tend
 
   ! CCPP-ized HB scheme
@@ -979,36 +977,32 @@ subroutine vertical_diffusion_tend( &
   tautoty(:ncol) = cam_in%wsy(:ncol)
 
   ! ---------------------------------------- !
-  ! Computation of turbulent mountain stress !
+  ! Add in turbulent mountain stress (CAM5)  !
   ! ---------------------------------------- !
 
-  ! Consistent with the computation of 'normal' drag coefficient, we are using
-  ! the raw input (u,v) to compute 'ksrftms', not the provisionally-marched 'u,v'
+  ! Consistent with the computation of 'normal' drag coefficient,
+  ! the raw input (u,v) is used to compute 'ksrftms', not the provisionally-marched 'u,v'
   ! within the iteration loop of the PBL scheme.
-
-  call trb_mtn_stress_tend(state, pbuf, cam_in)
 
   call pbuf_get_field(pbuf, ksrftms_idx, ksrftms)
   call pbuf_get_field(pbuf, tautmsx_idx, tautmsx)
   call pbuf_get_field(pbuf, tautmsy_idx, tautmsy)
 
-  ! Add turbulent mountain stress to total surface stress
+  ! Add turbulent mountain stress to total surface stress for PBL scheme.
   ! tautotx(:ncol) = cam_in%wsx(:ncol) + tautmsx(:ncol)
   ! tautoty(:ncol) = cam_in%wsy(:ncol) + tautmsy(:ncol)
   tautotx(:ncol) = tautotx(:ncol) + tautmsx(:ncol)
   tautoty(:ncol) = tautoty(:ncol) + tautmsy(:ncol)
 
   ! ------------------------------------- !
-  ! Computation of Beljaars SGO form drag !
+  ! Add in Beljaars SGO form drag (CAM6+) !
   ! ------------------------------------- !
-
-  call beljaars_drag_tend(state, pbuf, cam_in)
 
   call pbuf_get_field(pbuf, dragblj_idx, dragblj)
   call pbuf_get_field(pbuf, taubljx_idx, taubljx)
   call pbuf_get_field(pbuf, taubljy_idx, taubljy)
 
-  ! Add Beljaars integrated drag to total surface stress
+  ! Add Beljaars integrated drag to total surface stress for PBL scheme.
   tautotx(:ncol) = tautotx(:ncol) + taubljx(:ncol)
   tautoty(:ncol) = tautoty(:ncol) + taubljy(:ncol)
 
