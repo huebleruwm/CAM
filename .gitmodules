@@ -117,7 +117,7 @@
 [submodule "cism"]
 path = components/cism
 url = https://github.com/ESCOMP/CISM-wrapper
-fxtag = cismwrap_2_2_008
+fxtag = cismwrap_2_2_010
 fxrequired = ToplevelRequired
 fxDONOTUSEurl = https://github.com/ESCOMP/CISM-wrapper
 
@@ -145,7 +145,7 @@ fxDONOTUSEurl = https://github.com/ESCOMP/mizuRoute
 [submodule "ccs_config"]
 path = ccs_config
 url = https://github.com/ESMCI/ccs_config_cesm.git
-fxtag = ccs_config_cesm1.0.58
+fxtag = ccs_config_cesm1.0.59
 fxrequired = ToplevelRequired
 fxDONOTUSEurl = https://github.com/ESMCI/ccs_config_cesm.git
 
