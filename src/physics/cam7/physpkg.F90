@@ -2164,14 +2164,14 @@ contains
     !------------------------------------------
     if (trim(cam_take_snapshot_before) == "orographic_form_drag_stress") then
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf,&
-                    fh2o, surfric, obklen, flx_heat)
+                    fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
     end if
 
     call beljaars_drag_tend(state, pbuf, cam_in)
 
     if (trim(cam_take_snapshot_after) == "orographic_form_drag_stress") then
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
-                    fh2o, surfric, obklen, flx_heat)
+                    fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
     end if
 
     !------------------------------------------
