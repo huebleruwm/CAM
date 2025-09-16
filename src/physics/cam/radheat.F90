@@ -302,7 +302,7 @@ end subroutine radheat_readnl
    ! ++ jtb test setting M/LT SW to scaled cosine
    ! solar zenith angle
 
-   qrs_mlt_prof = qrs_mlt_profile( zref_mid_7km )
+   qrs_mlt_prof = qrs_mlt_profile_a( zref_mid_7km )
    do k = 1,pver
       qrs_mlt(:,k) = qrsmlt_scaling * qrs_mlt_prof(k) * max( coszrs(:) , 0._r8 ) / 86400._r8
    end do
@@ -396,7 +396,7 @@ end subroutine radheat_readnl
 !--------------------------------------------------------------------
 !--------------------------------------------------------------------
   ! Elemental: works on scalars and arrays
-  pure elemental function qrs_mlt_profile(z) result(x)
+  pure elemental function qrs_mlt_profile_b(z) result(x)
     !---------------------------------------------------------------
     ! Returns profile of SW heating (K/day) based on curve
     ! fitting to equatorial mean profile of QRS_TOT in:
@@ -422,6 +422,34 @@ end subroutine radheat_readnl
     
     x = c0 + c1*z + a1 * tanh( (z - z1)/s1 ) + a2 * tanh( (z - z2)/s2 )
 
-  end function qrs_mlt_profile
+  end function qrs_mlt_profile_b
+!-----------------------------------------------------------------------
+! Pure elemental function: works on scalars or arrays, side-effect free.
+!-----------------------------------------------------------------------
+  pure elemental function qrs_mlt_profile_a(z) result(x)
+    !---------------------------------------------------------------
+    ! Returns profile of SW heating (K/day) based on curve
+    ! fitting to equatorial mean profile of QRS_TOT in:
+    !
+    !        SCWACCM_forcing_zm_L70_1849-2015_CMIP6ensAvg_c181011.nc
+    !----------------------------------------------------------------
+    implicit none
+    real(r8), intent(in) :: z
+    real(r8) :: x             ! heating in K/day
+
+    ! ---- Best-fit parameters ----
+    real(r8), parameter :: c0_1 = -11.839696742958163_r8	
+    real(r8), parameter :: c1_1 =   0.23077408652259085_r8	
+    real(r8), parameter :: a1_1 =   3.741649559788312_r8	
+    real(r8), parameter :: z1_1 =  36.50366034343402_r8	
+    real(r8), parameter :: s1_1 =   8.696300405188122_r8	
+
+    if (z < 40._r8 ) then
+       x = 0._r8	
+    else
+       x = c0_1 + c1_1*z + a1_1*sin( (z - z1_1)/s1_1 )
+    end if
+
+  end function qrs_mlt_profile_a
 
 end module radheat
