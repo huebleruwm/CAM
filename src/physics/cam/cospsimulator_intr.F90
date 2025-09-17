@@ -725,11 +725,11 @@ CONTAINS
             'Frequency of drizzling single-layer warm clouds', flag_xyfill=.true., fill_value=R_UNDEF)
        call addfld('CS_WR_PRECIP',  horiz_only, 'A', '1', &
             'Frequency of precipitating single-layer warm clouds', flag_xyfill=.true., fill_value=R_UNDEF)
-       call addfld('CS_WR_CFODD_REFF_SMALL',(/'cosp_cfodd_dbze','cosp_cfodd_icod'/), 'A', 'fraction', &
+       call addfld('CS_WR_CFODD_REFF_SMALL',(/'cosp_cfodd_dbze','cosp_cfodd_icod'/), 'A', '1', &
             '# of CFODD (05 < Reff < 12 micron)', flag_xyfill=.true., fill_value=R_UNDEF)
-       call addfld('CS_WR_CFODD_REFF_MEDIUM',(/'cosp_cfodd_dbze','cosp_cfodd_icod'/), 'A', 'fraction', &
+       call addfld('CS_WR_CFODD_REFF_MEDIUM',(/'cosp_cfodd_dbze','cosp_cfodd_icod'/), 'A', '1', &
             '# of CFODD (12 < Reff < 18 micron)', flag_xyfill=.true., fill_value=R_UNDEF)
-       call addfld('CS_WR_CFODD_REFF_LARGE',(/'cosp_cfodd_dbze','cosp_cfodd_icod'/), 'A', 'fraction', &
+       call addfld('CS_WR_CFODD_REFF_LARGE',(/'cosp_cfodd_dbze','cosp_cfodd_icod'/), 'A', '1', &
             '# of CFODD (18 < Reff < 35 micron)', flag_xyfill=.true., fill_value=R_UNDEF)
 
        call add_default('CFAD_DBZE94_CS',cosp_histfile_num,' ')
@@ -873,7 +873,7 @@ CONTAINS
           'COSP Pressure (layer interface)', flag_xyfill=.true., fill_value=R_UNDEF)
        call addfld ('ZLEV_COSP',       (/            'trop_pref'/), 'I','m',  &
           'COSP Height (layer midpoint)', flag_xyfill=.true., fill_value=R_UNDEF)
-       call addfld ('ZLEV_HALF_COSP',  (/            'trop_prefi'/), 'I','m',  &
+       call addfld ('ZLEV_HALF_COSP',  (/            'trop_pref'/), 'I','m',  &
           'COSP Height (layer interface)', flag_xyfill=.true., fill_value=R_UNDEF)
        call addfld ('T_COSP',          (/            'trop_pref'/), 'I','K',  &
           'COSP Temperature', flag_xyfill=.true., fill_value=R_UNDEF)
