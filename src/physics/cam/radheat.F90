@@ -114,7 +114,7 @@ end subroutine radheat_readnl
 
   subroutine radheat_init(pref_mid)
 
-    
+
     use nlte_fomichev,    only: nlte_fomichev_init
     use phys_control,     only: phys_getopts
     use cam_history,      only: addfld
@@ -139,7 +139,7 @@ end subroutine radheat_readnl
 !-----------------------------------------------------------------------
 
     zref_mid_7km = -7.0_r8 * log( pref_mid/100000._r8 )
-    
+
     call phys_getopts(radiation_scheme_out=rad_pkg, &
                       history_waccm_out=history_waccm, &
                       history_scwaccm_forcing_out=history_scwaccm_forcing)
@@ -180,7 +180,7 @@ end subroutine radheat_readnl
        endif
 
     end do
-    
+
     co2_mw = mwco2
     o1_mw  = 16._r8
     o2_mw  = 32._r8
@@ -190,7 +190,7 @@ end subroutine radheat_readnl
     nlte_limit_co2 = .true.
 ! Initialize Fomichev parameterization
     call nlte_fomichev_init (co2_mw, n2_mw, o1_mw, o2_mw, o3_mw, no_mw, nlte_limit_co2)
-    
+
 
     ! determine upppermost level that is purely solar heating (no MLT chem heating)
     ntop_qrs_cam = 0
@@ -201,7 +201,7 @@ end subroutine radheat_readnl
     ! Add history variables to master field list
     call addfld ('QRL_TOT',(/ 'lev' /), 'A','K/s','Merged LW heating: QRL+QRL_MLT')
     call addfld ('QRS_TOT',(/ 'lev' /), 'A','K/s','Merged SW heating: QRS+QRS_MLT')
-    
+
   end subroutine radheat_init
 
 !================================================================================================
@@ -260,7 +260,7 @@ end subroutine radheat_readnl
     real(r8),            intent(out) :: net_flx(pcols)
 
 ! Local variables
-    integer  :: k 
+    integer  :: k
     integer  :: ncol                                ! number of atmospheric columns
     integer  :: lchnk                               ! chunk identifier
     real(r8) :: qrl_mrg(pcols,pver)                 ! merged LW heating
@@ -297,10 +297,8 @@ end subroutine radheat_readnl
     ncol  = state%ncol
     lchnk = state%lchnk
     call physics_ptend_init(ptend, state%psetcols, 'radheat', ls=.true.)
- 
-   ! Shortwave heating is RRTMG solar heating only
-   ! ++ jtb test setting M/LT SW to scaled cosine
-   ! solar zenith angle
+
+   ! Setting idealized M/LT SW to scaled cosine solar zenith angle
 
    qrs_mlt_prof = qrs_mlt_profile_a( zref_mid_7km )
    do k = 1,pver
@@ -343,7 +341,7 @@ end subroutine radheat_readnl
 
 
 
-   
+
    ! REMOVECAM no longer need once CAM is retired and pcols doesn't exist
    net_flx = 0._r8
    ptend%s = 0._r8
@@ -411,6 +409,21 @@ end subroutine radheat_readnl
     real(r8) :: c0, c1, a1, z1, s1, a2, z2, s2
 
     ! Assign values from popt
+
+    ! --------------------
+    ! Values from are from fitting to mean equatorial WACCM QRS_TOT in
+    !
+    ! SCWACCM_forcing_zm_L70_1849-2015_CMIP6ensAvg_c181011.nc
+    !
+    ! using function 'curve_fit' in scipy.optimize:
+    ! https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.curve_fit.html
+    !
+    ! applied to the functional form:
+    ! c0 + c1*z + a1 * tanh( (z - z1)/s1 ) + a2 * tanh( (z - z2)/s2 )
+    !
+    ! z is in the range 0 to 100km
+    ! --------------------
+
     c0 = 32.45612064_r8
     c1 = -0.50124861_r8
     a1 = 19.11626479_r8
@@ -419,7 +432,7 @@ end subroutine radheat_readnl
     a2 = 13.50543681_r8
     z2 = 87.95888464_r8
     s2 =  9.94346974_r8
-    
+
     x = c0 + c1*z + a1 * tanh( (z - z1)/s1 ) + a2 * tanh( (z - z2)/s2 )
 
   end function qrs_mlt_profile_b
@@ -434,18 +447,29 @@ end subroutine radheat_readnl
     !        SCWACCM_forcing_zm_L70_1849-2015_CMIP6ensAvg_c181011.nc
     !----------------------------------------------------------------
     implicit none
-    real(r8), intent(in) :: z
+    real(r8), intent(in) :: z ! reference height profile
     real(r8) :: x             ! heating in K/day
 
     ! ---- Best-fit parameters ----
-    real(r8), parameter :: c0_1 = -11.839696742958163_r8	
-    real(r8), parameter :: c1_1 =   0.23077408652259085_r8	
-    real(r8), parameter :: a1_1 =   3.741649559788312_r8	
-    real(r8), parameter :: z1_1 =  36.50366034343402_r8	
-    real(r8), parameter :: s1_1 =   8.696300405188122_r8	
+    ! Values from are from fitting to mean equatorial WACCM QRS_TOT in
+    !
+    ! SCWACCM_forcing_zm_L70_1849-2015_CMIP6ensAvg_c181011.nc
+    ! https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.curve_fit.html
+    !
+    ! applied to the functional form:
+    ! c0_1 + c1_1z + a1_1sin( (z - z1_1)/s1_1 )
+    !
+    ! z is in the range 40 to 100km
+    ! ----------
+    real(r8), parameter :: c0_1 = -11.839696742958163_r8
+    real(r8), parameter :: c1_1 =   0.23077408652259085_r8
+    real(r8), parameter :: a1_1 =   3.741649559788312_r8
+    real(r8), parameter :: z1_1 =  36.50366034343402_r8
+    real(r8), parameter :: s1_1 =   8.696300405188122_r8
 
+    ! Set heating rate profile to zero below 40km.  Above 40km, use funtional form
     if (z < 40._r8 ) then
-       x = 0._r8	
+       x = 0._r8
     else
        x = c0_1 + c1_1*z + a1_1*sin( (z - z1_1)/s1_1 )
     end if
