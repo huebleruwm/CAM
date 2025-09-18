@@ -41,7 +41,7 @@ module radheat
 
   real(r8), public :: p_top_for_equil_rad = 0._r8
   real(r8), public :: p_top_for_radmrg = 0._r8
-  real(r8), public :: p_bot_for_radmrg = 0._r8
+  real(r8), public :: p_bot_for_radmrg = 1._r8
   real(r8), public :: qrsmlt_scaling = 1.0_r8 ! Scaling for "M/LT" SW heating
 
 ! Private variables for merging heating rates
@@ -296,13 +296,15 @@ end subroutine radheat_readnl
 
     ncol  = state%ncol
     lchnk = state%lchnk
+    qrs_mlt(:,:) = 0._r8
+
     call physics_ptend_init(ptend, state%psetcols, 'radheat', ls=.true.)
 
    ! Setting idealized M/LT SW to scaled cosine solar zenith angle
 
    qrs_mlt_prof = qrs_mlt_profile_a( zref_mid_7km )
    do k = 1,pver
-      qrs_mlt(:,k) = qrsmlt_scaling * qrs_mlt_prof(k) * max( coszrs(:) , 0._r8 ) / 86400._r8
+      qrs_mlt(:ncol,k) = qrsmlt_scaling * qrs_mlt_prof(k) * max( coszrs(:ncol) , 0._r8 ) / 86400._r8
    end do
 
    icall = 0
