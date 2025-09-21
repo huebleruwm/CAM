@@ -454,7 +454,7 @@ subroutine compute_eddy_diff( pbuf, lchnk  ,                                    
   real(r8), intent(in)    :: taux(pcols)               ! Zonal wind stress at surface [ N/m2 ]
   real(r8), intent(in)    :: tauy(pcols)               ! Meridional wind stress at surface [ N/m2 ]
   real(r8), intent(in)    :: shflx(pcols)              ! Sensible heat flux at surface [ unit ? ]
-  real(r8), intent(in)    :: qflx(pcols,1)             ! Water vapor flux at surface [ unit ? ]
+  real(r8), intent(in)    :: qflx(pcols,1)             ! Water vapor flux at surface [ kg/m2/s]
   real(r8), intent(in)    :: kvm_in(pcols,pver+1)      ! kvm saved from last timestep [ m2/s ]
   real(r8), intent(in)    :: kvh_in(pcols,pver+1)      ! kvh saved from last timestep [ m2/s ]
   real(r8), intent(in)    :: ksrftms(pcols)            ! Surface drag coefficient of turbulent mountain stress [ unit ? ]
