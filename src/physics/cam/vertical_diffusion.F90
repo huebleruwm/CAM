@@ -102,8 +102,8 @@ logical              :: do_pseudocon_diff = .false.  ! If .true., do pseudo-cons
 
 character(len=16)    :: shallow_scheme               ! Shallow convection scheme
 
-logical              :: do_diffusion_const_dry(pcnst)! Do vertical diffusion (as dry) for this constituent?
-logical              :: do_diffusion_const_wet(pcnst)! Do vertical diffusion (as wet) for this constituent?
+logical              :: do_diffusion_const_dry(pcnst)! Do vertical diffusion (as a dry mixing ratio) for this constituent?
+logical              :: do_diffusion_const_wet(pcnst)! Do vertical diffusion (as a wet mixing ratio) for this constituent?
 logical              :: do_molecular_diffusion_const(pcnst) ! Do molecular diffusion for this constituent?
                                                             ! In compute_vdiff, both do_diffusion_const and molecular_diffusion_const
                                                             ! have to be true for molec diff to happen
