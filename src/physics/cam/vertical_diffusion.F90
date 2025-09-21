@@ -1031,7 +1031,7 @@ subroutine vertical_diffusion_tend( &
   q_wv_cflx(:) = 0._r8
   !END REMOVECAM
 
-  if(eddy_scheme .eq. 'CLUBB_SGS') then
+  if(eddy_scheme == 'CLUBB_SGS') then
      ! If running CLUBB_SGS, use the hb_free_atm CCPPized interstitial.
      !
      ! In this case, vertical diffusion solver only applies constituent fluxes excluding water vapor
