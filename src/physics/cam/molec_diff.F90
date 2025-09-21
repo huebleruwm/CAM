@@ -253,7 +253,7 @@ contains
 
     real(r8), intent(in)    :: t(:,:)	    ! Air temperature [ K ]
     integer,  intent(in)    :: m 		    ! cnst index
-    real(r8), intent(in)    :: mbarv(:,:)  ! composition dependent molar mass of dry air [ kg kmol-1]
+    real(r8), intent(in)    :: mbarv(:,:)  ! composition dependent molar mass of dry air [ kg mol-1 ]
 
     ! Decomposition covering levels without vertical diffusion.
     type(TriDiagDecomp), intent(in) :: no_molec_decomp

@@ -1002,8 +1002,6 @@ subroutine vertical_diffusion_tend( &
   call pbuf_get_field(pbuf, tautmsy_idx, tautmsy)
 
   ! Add turbulent mountain stress to total surface stress for PBL scheme.
-  ! tautotx(:ncol) = cam_in%wsx(:ncol) + tautmsx(:ncol)
-  ! tautoty(:ncol) = cam_in%wsy(:ncol) + tautmsy(:ncol)
   tautotx(:ncol) = tautotx(:ncol) + tautmsx(:ncol)
   tautoty(:ncol) = tautoty(:ncol) + tautmsy(:ncol)
 
@@ -1410,6 +1408,8 @@ subroutine vertical_diffusion_tend( &
 
   if(.not. do_molec_diff) then
     ! Dry static energy top boundary is zero if no molecular diffusion
+    ! Note: this is an artifact to the way the vertical diffusion calculations are done;
+    ! it does not represent physical reality.
     dse_top(:ncol) = 0._r8
 
     ksrf(:) = 0._r8
