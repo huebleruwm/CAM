@@ -197,7 +197,7 @@ subroutine eddy_diff_init(pbuf2d, ntop_eddy_in, nbot_eddy_in)
   end do
   ml2(nbot_eddy+1:pver+1) = 0._r8
 
-  ! Only diffuse constituent 1 and disable molecular diffusion
+ ! Only diffuse water vapor (constituent 1) and disable molecular diffusion
   do_diffusion_const_wet(:) = .false.
   do_molecular_diffusion_const(:) = .false.
   do_diffusion_const_wet(1) = .true.
