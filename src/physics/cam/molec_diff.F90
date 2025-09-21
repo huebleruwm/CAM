@@ -248,7 +248,7 @@ contains
     type(Coords1D), intent(in) :: p                  ! Pressure coordinates
     type(BoundaryType), intent(in) :: interface_boundary ! Boundary on grid edge.
     type(BoundaryType), intent(in) :: molec_boundary ! Boundary at edge of molec_diff region.
-    real(r8), intent(in)    :: tint(:,:)    ! Interface temperature [ K ], interfaces
+    real(r8), intent(in)    :: tint(:,:)    ! Air temperature [ K ], interfaces
     real(r8), intent(in)    :: ztodt                 ! 2 delta-t [ s ]
 
     real(r8), intent(in)    :: t(:,:)	    ! temperature
