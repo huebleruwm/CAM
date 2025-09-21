@@ -386,6 +386,10 @@ subroutine vertical_diffusion_init(pbuf2d)
       errmsg = errmsg, &
       errflg = errflg)
 
+     if(errflg /= 0) then
+        call endrun('holtslag_boville_diff_init: ' // errmsg)
+     endif
+
      call addfld('HB_ri',      (/ 'lev' /),  'A', 'no',  'Richardson Number (HB Scheme), I' )
   case ( 'CLUBB_SGS' )
      is_clubb_scheme = .true.
@@ -401,6 +405,11 @@ subroutine vertical_diffusion_init(pbuf2d)
       ntop_turb_in = ntop_eddy, &
       errmsg = errmsg, &
       errflg = errflg)
+
+     if(errflg /= 0) then
+        call endrun('holtslag_boville_diff_init: ' // errmsg)
+     endif
+
      !
      ! run HB scheme where CLUBB is not active when running cam7 or cam6 physics
      ! else init_hb_diff is called just for diagnostic purposes
@@ -969,6 +978,10 @@ subroutine vertical_diffusion_tend( &
        errmsg   = errmsg, &
        errflg   = errflg)
 
+  if(errflg /= 0) then
+     call endrun('vertical_diffusion_interpolate_to_interfaces_run: ' // errmsg)
+  endif
+
   ! Initialize total surface stresses
   ! these are used for HB diffusion scheme and later PBL diagnostics but
   ! not for the vertical diffusion solver, which uses surface stresses from the coupler
@@ -1041,6 +1054,10 @@ subroutine vertical_diffusion_tend( &
           q_wv_cflx         = q_wv_cflx(:ncol),           & ! for use in HB for kinematic water vapor flux calc.
           errmsg            = errmsg,                     &
           errflg            = errflg)
+
+     if(errflg /= 0) then
+        call endrun('hb_free_atm_diff_prepare_vertical_diffusion_inputs_run: ' // errmsg)
+     endif
   else
      call hb_diff_prepare_vertical_diffusion_inputs_run( &
           ncol               = ncol,                      &
@@ -1062,6 +1079,10 @@ subroutine vertical_diffusion_tend( &
           q_wv_cflx          = q_wv_cflx(:ncol),          & ! for use in HB for kinematic water vapor flux calc.
           errmsg             = errmsg,                 &
           errflg             = errflg)
+
+     if(errflg /= 0) then
+        call endrun('hb_diff_prepare_vertical_diffusion_inputs_run: ' // errmsg)
+     endif
   endif
 
   !----------------------------------------------------------------------- !
@@ -1142,6 +1163,10 @@ subroutine vertical_diffusion_tend( &
        errmsg    = errmsg,                   &
        errflg    = errflg)
 
+     if(errflg /= 0) then
+        call endrun('hb_pbl_independent_coefficients_run: ' // errmsg)
+     endif
+
      !REMOVECAM - no longer need this when CAM is retired and pcols no longer exists
      pblh(:) = 0._r8
      wstar(:) = 0._r8
@@ -1168,6 +1193,10 @@ subroutine vertical_diffusion_tend( &
        bge       = bge(:ncol),                                &
        errmsg    = errmsg,                                    &
        errflg    = errflg)
+
+     if(errflg /= 0) then
+        call endrun('hb_pbl_dependent_coefficients_run: ' // errmsg)
+     endif
 
      !REMOVECAM - no longer need this when CAM is retired and pcols no longer exists
      kvm(:,:) = 0._r8
@@ -1210,6 +1239,10 @@ subroutine vertical_diffusion_tend( &
        tke       = tke(:ncol,:pverp),                         &
        errmsg    = errmsg,                                    &
        errflg    = errflg)
+
+     if(errflg /= 0) then
+        call endrun('hb_diff_exchange_coefficients_run: ' // errmsg)
+     endif
 
      call outfld( 'HB_ri',          ri,         pcols,   lchnk )
 
@@ -1260,6 +1293,10 @@ subroutine vertical_diffusion_tend( &
         errmsg    = errmsg,                   &
         errflg    = errflg)
 
+      if(errflg /= 0) then
+         call endrun('hb_pbl_independent_coefficients_run: ' // errmsg)
+      endif
+
       call pbuf_get_field(pbuf, clubbtop_idx, clubbtop)
       clubbtop_r = real(clubbtop, r8)
 
@@ -1287,6 +1324,10 @@ subroutine vertical_diffusion_tend( &
         cgs       = cgs(:ncol,:pverp),                         &
         errmsg    = errmsg,                                    &
         errflg    = errflg)
+
+      if(errflg /= 0) then
+         call endrun('hb_diff_free_atm_exchange_coefficients_run: ' // errmsg)
+      endif
 
       call outfld( 'HB_ri',          ri,         pcols,   lchnk )
     else
@@ -1329,6 +1370,10 @@ subroutine vertical_diffusion_tend( &
     kvm    = kvm,    & ! in/out
     errmsg = errmsg, &
     errflg = errflg)
+
+  if(errflg /= 0) then
+     call endrun('vertical_diffusion_sponge_layer_run: ' // errmsg)
+  endif
 
   ! kvh (in pbuf) is used by other physics parameterizations, and as an initial guess in compute_eddy_diff
   ! on the next timestep.  It is not updated by the compute_vdiff call below.
@@ -1386,6 +1431,10 @@ subroutine vertical_diffusion_tend( &
          errmsg          = errmsg,                       &
          errflg          = errflg)
 
+    if(errflg /= 0) then
+       call endrun('implicit_surface_stress_add_drag_coefficient_run: ' // errmsg)
+    endif
+
     ! Add TMS surface drag rate
     call turbulent_mountain_stress_add_drag_coefficient_run( &
          ncol            = ncol,                         &
@@ -1395,6 +1444,10 @@ subroutine vertical_diffusion_tend( &
          ksrf            = ksrf(:ncol),                  &
          errmsg          = errmsg,                       &
          errflg          = errflg)
+
+    if(errflg /= 0) then
+       call endrun('turbulent_mountain_stress_add_drag_coefficient_run: ' // errmsg)
+    endif
 
     ! Based on the drag coefficients, calculate wind damping rates
     call vertical_diffusion_wind_damping_rate_run( &
@@ -1408,6 +1461,10 @@ subroutine vertical_diffusion_tend( &
          errmsg          = errmsg,                       &
          errflg          = errflg)
 
+    if(errflg /= 0) then
+       call endrun('vertical_diffusion_wind_damping_rate_run: ' // errmsg)
+    endif
+
     ! Add Beljaars wind damping rate
     call beljaars_add_wind_damping_rate_run( &
          ncol            = ncol,                         &
@@ -1417,6 +1474,10 @@ subroutine vertical_diffusion_tend( &
          tau_damp_rate   = tau_damp_rate(:ncol,:pver),   &
          errmsg          = errmsg,                       &
          errflg          = errflg)
+
+    if(errflg /= 0) then
+       call endrun('beljaars_add_wind_damping_rate_run: ' // errmsg)
+    endif
 
     ! If molecular diffusion is not done, use the CCPP-ized subroutine
     call vertical_diffusion_diffuse_horizontal_momentum_run( &
@@ -1457,6 +1518,10 @@ subroutine vertical_diffusion_tend( &
          errmsg          = errmsg,                       &
          errflg          = errflg)
 
+    if(errflg /= 0) then
+       call endrun('vertical_diffusion_diffuse_horizontal_momentum_run: ' // errmsg)
+    endif
+
     ! Diffuse dry static energy
     call vertical_diffusion_diffuse_dry_static_energy_run( &
          ncol            = ncol,                         &
@@ -1474,6 +1539,10 @@ subroutine vertical_diffusion_tend( &
          dse             = s_tmp(:ncol,:pver),           &
          errmsg          = errmsg,                       &
          errflg          = errflg)
+
+    if(errflg /= 0) then
+       call endrun('vertical_diffusion_diffuse_dry_static_energy_run: ' // errmsg)
+    endif
 
     ! Diffuse tracers
     call vertical_diffusion_diffuse_tracers_run( &
@@ -1500,6 +1569,10 @@ subroutine vertical_diffusion_tend( &
          q1              = q_tmp(:ncol,:pver,:pcnst),    &
          errmsg          = errmsg,                       &
          errflg          = errflg)
+
+    if(errflg /= 0) then
+       call endrun('vertical_diffusion_diffuse_tracers_run: ' // errmsg)
+    endif
   else
      ! Molecular diffusion is active, use old compute_vdiff
 
@@ -1519,6 +1592,10 @@ subroutine vertical_diffusion_tend( &
              dse_top = dse_top(:ncol), &
              errmsg = errmsg, &
              errflg = errflg)
+
+       if(errflg /= 0) then
+          call endrun('vertical_diffusion_set_dry_static_energy_at_toa_molecdiff_run: ' // errmsg)
+       endif
      else
         dse_top(:ncol) = 0._r8
      end if
@@ -1715,6 +1792,10 @@ subroutine vertical_diffusion_tend( &
      scheme_name = scheme_name, &
      errmsg      = errmsg, &
      errflg      = errflg)
+
+  if(errflg /= 0) then
+     call endrun("vertical_diffusion_tendencies_run: " // errmsg)
+  endif
 
   ! -------------------------------------------------------- !
   ! Diagnostics and output writing after applying PBL scheme !

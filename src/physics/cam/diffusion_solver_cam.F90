@@ -180,7 +180,7 @@
     logical,  intent(in)    :: use_temperature_molec_diff! Flag indicating that molecular diffusion should apply to temperature, not
                                                          ! dry static energy.
     real(r8), intent(in)    :: cpairv(:,:)      ! Specific heat at constant pressure
-    real(r8), intent(in)    :: mbarv(:,:)       ! Composition dependent atmosphere mean mass
+    real(r8), intent(in)    :: mbarv(:,:)       ! Composition dependent atmosphere mean molar mass [kg mol-1]
 
     ! The molecular diffusion module will likely change significantly in
     ! the future, and this module may directly depend on it after that.
@@ -803,7 +803,7 @@
            molec_boundary = molec_boundary, &
            t = t(:ncol,:), & ! temperature, midpoints
            tint = tint(:ncol,:), & ! temperature, interfaces
-           mbarv = mbarv(:ncol,:), & ! composition dependent atmosphere mean mass
+           mbarv = mbarv(:ncol,:), & ! composition dependent atmosphere mean molar mass
            ztodt = ztodt, &
            nbot_molec = nbot_molec, &
            no_molec_decomp = no_molec_decomp)
