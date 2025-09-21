@@ -120,7 +120,7 @@
     integer,  intent(in) :: pver
     integer,  intent(in) :: pverp
     integer,  intent(in) :: ncnst            ! # of constituents to diffuse. In eddy_diff, only wv. Others, pcnst.
-    real(r8), intent(in) :: ztodt            ! 2 delta-t [ s ]
+    real(r8), intent(in) :: ztodt            ! delta-t [ s ]
 
     logical,  intent(in) :: do_diffusion_u_v                ! diffuse horizontal winds [flag]
     logical,  intent(in) :: do_diffusion_s                  ! diffuse dry static energy [flag]
