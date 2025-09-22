@@ -1200,14 +1200,14 @@ CONTAINS
     
     ! Cloudsat outputs
     character(len=max_fieldname_len),dimension(nf_radar),parameter ::          &
-         fname_radar = (/'CFAD_DBZE94_CS', 'CLD_CAL_NOTCS ', 'DBZE_CS       ', &
-                         'CLDTOT_CALCS  ', 'CLDTOT_CS     ', 'CLDTOT_CS2    ', &
-                         'CS_NOPRECIP   ', 'CS_RAINPOSS   ', 'CS_RAINPROB   ', &
-                         'CS_RAINCERT   ', 'CS_SNOWPOSS   ', 'CS_SNOWCERT   ', &
-                         'CS_MIXPOSS    ', 'CS_MIXCERT    ', 'CS_RAINHARD   ', &
-                         'CS_UN         ', 'CS_PIA        ', 'CS_WR_NOPRECIP', &
-                         'CS_WR_DRIZ    ', 'CS_WR_PRECIP  ', 'CS_WR_CFODD_REFF_SMALL', &
-                         'CS_WR_CFODD_REFF_MEDIUM', 'CS_WR_CFODD_REFF_LARGE'/)
+          fname_radar = (/'CFAD_DBZE94_CS         ', 'CLD_CAL_NOTCS          ', 'DBZE_CS                ', &
+                          'CLDTOT_CALCS           ', 'CLDTOT_CS              ', 'CLDTOT_CS2             ', &
+                          'CS_NOPRECIP            ', 'CS_RAINPOSS            ', 'CS_RAINPROB            ', &
+                          'CS_RAINCERT            ', 'CS_SNOWPOSS            ', 'CS_SNOWCERT            ', &
+                          'CS_MIXPOSS             ', 'CS_MIXCERT             ', 'CS_RAINHARD            ', &
+                          'CS_UN                  ', 'CS_PIA                 ', 'CS_WR_NOPRECIP         ', &
+                          'CS_WR_DRIZ             ', 'CS_WR_PRECIP           ', 'CS_WR_CFODD_REFF_SMALL ', &
+                          'CS_WR_CFODD_REFF_MEDIUM', 'CS_WR_CFODD_REFF_LARGE '/)
 
     ! CALIPSO outputs
     character(len=max_fieldname_len),dimension(nf_calipso),parameter :: &
@@ -1227,12 +1227,12 @@ CONTAINS
          fname_misr=(/'CLD_MISR '/)
     ! MODIS outputs
     character(len=max_fieldname_len),dimension(nf_modis) :: &
-         fname_modis=(/'CLTMODIS    ','CLWMODIS    ','CLIMODIS    ','CLHMODIS    ','CLMMODIS    ',&
-                       'CLLMODIS    ','TAUTMODIS   ','TAUWMODIS   ','TAUIMODIS   ','TAUTLOGMODIS',&
-                       'TAUWLOGMODIS','TAUILOGMODIS','REFFCLWMODIS','REFFCLIMODIS',&
-                       'PCTMODIS    ','LWPMODIS    ','IWPMODIS    ','CLMODIS     ','CLRIMODIS   ',&
-                       'CLRLMODIS   ','CLMODIS_LIQ ','CLMODIS_ICE ','LWP_REFFCLW_MODIS          ',&
-                       'IWP_REFFCLI_MODIS'/)
+         fname_modis=(/'CLTMODIS         ','CLWMODIS         ','CLIMODIS         ','CLHMODIS         ',&
+                       'CLMMODIS         ','CLLMODIS         ','TAUTMODIS        ','TAUWMODIS        ',&
+                       'TAUIMODIS        ','TAUTLOGMODIS     ','TAUWLOGMODIS     ','TAUILOGMODIS     ',&
+                       'REFFCLWMODIS     ','REFFCLIMODIS     ','PCTMODIS         ','LWPMODIS         ',&
+                       'IWPMODIS         ','CLMODIS          ','CLRIMODIS        ','CLRLMODIS        ',&
+                       'CLMODIS_LIQ      ','CLMODIS_ICE      ','LWP_REFFCLW_MODIS','IWP_REFFCLI_MODIS'/)
     
     logical :: run_radar(nf_radar,pcols)                 ! logical telling you if you should run radar simulator
     logical :: run_calipso(nf_calipso,pcols)             ! logical telling you if you should run calipso simulator
