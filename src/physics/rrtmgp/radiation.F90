@@ -889,9 +889,9 @@ subroutine radiation_tend( &
    real(r8)          :: cld_lw_abs(nlwbands,state%ncol,pver)  ! Cloud absorption optics depth
    real(r8)          :: snow_lw_abs(nlwbands,state%ncol,pver) ! Snow absorption optics depth
    real(r8)          :: grau_lw_abs(nlwbands,state%ncol,pver) ! Graupel absorption optics depth
-   real(r8)          :: cld_tau(nswbands,state%ncol,pver)  ! Cloud absorption optics depth (sw)
-   real(r8)          :: snow_tau(nswbands,state%ncol,pver) ! Snow absorption optics depth (sw)
-   real(r8)          :: grau_tau(nswbands,state%ncol,pver) ! Graupel absorption optics depth (sw)
+   real(r8)          :: cld_tau(nswbands,state%ncol,pver)  ! Cloud absorption optical depth (sw)
+   real(r8)          :: snow_tau(nswbands,state%ncol,pver) ! Snow absorption optical depth (sw)
+   real(r8)          :: grau_tau(nswbands,state%ncol,pver) ! Graupel absorption optical depth (sw)
    real(r8)          :: c_cld_tau(nswbands,state%ncol,pver)
    real(r8)          :: c_cld_tau_w(nswbands,state%ncol,pver)
    real(r8)          :: c_cld_tau_w_g(nswbands,state%ncol,pver)
@@ -1146,13 +1146,14 @@ subroutine radiation_tend( &
          cldfsnow_in => zero_variable
       end if
       ! Grab additional pbuf fields for LW cloud optics
-      dei_idx = pbuf_get_index('DEI',errcode=err)
-      mu_idx  = pbuf_get_index('MU',errcode=err)
-      lambda_idx = pbuf_get_index('LAMBDAC',errcode=err)
+      dei_idx = pbuf_get_index('DEI')
+      mu_idx  = pbuf_get_index('MU')
+      lambda_idx = pbuf_get_index('LAMBDAC')
+      des_idx    = pbuf_get_index('DES')
+      icswp_idx  = pbuf_get_index('ICSWP')
+      ! Below fields are optional
       iciwp_idx  = pbuf_get_index('ICIWP',errcode=err)
       iclwp_idx  = pbuf_get_index('ICLWP',errcode=err)
-      des_idx    = pbuf_get_index('DES',errcode=err)
-      icswp_idx  = pbuf_get_index('ICSWP',errcode=err)
       icgrauwp_idx  = pbuf_get_index('ICGRAUWP',errcode=err) ! Available when using MG3
       degrau_idx    = pbuf_get_index('DEGRAU',errcode=err)   ! Available when using MG3
       call pbuf_get_field(pbuf, lambda_idx,  lambda)
@@ -1220,6 +1221,9 @@ subroutine radiation_tend( &
          call rrtmgp_sw_mcica_subcol_gen_run(dosw, kdist_sw, nswbands, nswgpts, nday, nlay, &
                  pver, tiny, idxday, ktopcam, ktoprad, cldfprime, c_cld_tau,   &
                  c_cld_tau_w, c_cld_tau_w_g, cloud_sw, pmid_day(:ncol,:), errmsg, errflg)
+         if (errflg /= 0) then
+            call endrun(sub//': '//errmsg)
+         end if
 
          if (write_output) then
             call radiation_output_cld(lchnk, rd)

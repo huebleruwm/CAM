@@ -10,7 +10,6 @@ module rrtmgp_inputs_cam
 
 use shr_kind_mod,     only: r8=>shr_kind_r8
 use ppgrid,           only: pcols, pver, pverp
-use cam_logfile, only: iulog
 
 use physconst,        only: stebol, pi
 
