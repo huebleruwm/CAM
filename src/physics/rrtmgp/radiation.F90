@@ -950,9 +950,6 @@ subroutine radiation_tend( &
    real(r8) :: snow_lw_abs_cloudsim(pcols,pver)! snow
    real(r8) :: grau_lw_abs_cloudsim(pcols,pver)! graupel
 
-   ! Set vertical indexing in RRTMGP to be the same as CAM (top to bottom).
-   logical, parameter :: top_at_1 = .true.
-
    logical :: do_graupel, do_snow
 
    ! TOA solar flux on RRTMGP g-points
@@ -1289,7 +1286,7 @@ subroutine radiation_tend( &
                   !$acc             cloud_sw%optical_props%g)                                         &
                   !$acc        copy(fswc%fluxes, fswc%fluxes%flux_net,fswc%fluxes%flux_up,fswc%fluxes%flux_dn,     &
                   !$acc             fsw%fluxes, fsw%fluxes%flux_net,fsw%fluxes%flux_up,fsw%fluxes%flux_dn)
-                  call rrtmgp_sw_rte_run(dosw, .true., .true., nday, 1, nday, atm_optics_sw, cloud_sw, top_at_1,  &
+                  call rrtmgp_sw_rte_run(dosw, .true., .true., nday, 1, nday, atm_optics_sw, cloud_sw,  &
                                  aer_sw, coszrs_day, toa_flux, alb_dir, alb_dif, fswc, fsw, errmsg, errflg)
                   if (errflg /= 0) then
                      call endrun(sub//': '//errmsg)
