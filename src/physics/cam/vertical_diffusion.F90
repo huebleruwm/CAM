@@ -209,7 +209,7 @@ subroutine vd_register()
   ! Register physics buffer fields and constituents !
   !------------------------------------------------ !
 
-  use physics_buffer,      only : pbuf_add_field, dtype_r8, dtype_i4
+  use physics_buffer,      only : pbuf_add_field, dtype_r8
   use trb_mtn_stress_cam,  only : trb_mtn_stress_register
   use beljaars_drag_cam,   only : beljaars_drag_register
   use eddy_diff_cam,       only : eddy_diff_register
@@ -274,7 +274,7 @@ subroutine vertical_diffusion_init(pbuf2d)
 
   use molec_diff,        only : init_molec_diff
   use diffusion_solver_cam, only : init_vdiff
-  use constituents,      only : cnst_get_ind, cnst_get_type_byind, cnst_name, cnst_get_molec_byind, cnst_ndropmixed
+  use constituents,      only : cnst_get_ind, cnst_name, cnst_get_molec_byind, cnst_ndropmixed
   use spmd_utils,        only : masterproc
   use ref_pres,          only : pref_mid
   use physics_buffer,    only : pbuf_set_field, pbuf_get_index, physics_buffer_desc
@@ -289,8 +289,6 @@ subroutine vertical_diffusion_init(pbuf2d)
   integer        :: ntop_eddy   ! Top    interface level to which eddy vertical diffusion is applied ( = 1 )
   integer        :: nbot_eddy   ! Bottom interface level to which eddy vertical diffusion is applied ( = pver )
   integer        :: k           ! Vertical loop index
-
-  integer :: ierr
 
   logical :: history_amwg                 ! output the variables used by the AMWG diag package
   logical :: history_eddy                 ! output the eddy variables
@@ -656,12 +654,16 @@ subroutine vertical_diffusion_tend( &
   use physics_buffer,     only : physics_buffer_desc, pbuf_get_field, pbuf_set_field
   use physics_types,      only : physics_state, physics_ptend, physics_ptend_init
 
+  ! flag for FV correction
   use phys_control,       only: fv_am_correction
+  ! flag for Beljaars
+  use beljaars_drag_cam,    only: do_beljaars
 
   use camsrfexch,           only : cam_in_t
   use cam_history,          only : outfld
 
   use eddy_diff_cam,        only : eddy_diff_tend
+
 
   ! CCPP-ized HB scheme
   use holtslag_boville_diff, only: hb_pbl_independent_coefficients_run
@@ -693,7 +695,6 @@ subroutine vertical_diffusion_tend( &
   ! Diagnostic utility subroutine shared with CCPP-ized/SIMA
   use vertical_diffusion_diagnostic_utils, only: vertical_diffusion_diagnostic_profiles
 
-  use wv_saturation,        only : qsat
   use diffusion_solver,     only: vertical_diffusion_set_dry_static_energy_at_toa_molecdiff_run
   use molec_diff,           only : compute_molec_diff, vd_lu_qdecomp
   use constituents,         only : qmincg, qmin, cnst_type
@@ -809,10 +810,8 @@ subroutine vertical_diffusion_tend( &
   real(r8) :: kqfs(pcols)                                         ! sfc kinematic water vapor flux [kg kg-1 m s-1]
   real(r8) :: kbfs(pcols)                                         ! sfc kinematic buoyancy flux [m^2/s^3]
 
-  real(r8) :: ftem(pcols,pver)                                    ! Saturation vapor pressure before PBL
   real(r8) :: ftem_prePBL(pcols,pver)                             ! Saturation vapor pressure before PBL
   real(r8) :: ftem_aftPBL(pcols,pver)                             ! Saturation vapor pressure after PBL
-  real(r8) :: tem2(pcols,pver)                                    ! Saturation specific humidity and RH
   real(r8) :: t_aftPBL(pcols,pver)                                ! Temperature after PBL diffusion
   real(r8) :: tten(pcols,pver)                                    ! Temperature tendency by PBL diffusion
   real(r8) :: rhten(pcols,pver)                                   ! RH tendency by PBL diffusion
