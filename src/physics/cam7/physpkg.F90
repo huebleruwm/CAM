@@ -1384,6 +1384,7 @@ contains
     use cam_diagnostics,    only: diag_phys_tend_writeout
     use gw_drag,            only: gw_tend
     use beljaars_drag_cam,  only: beljaars_drag_tend
+    use trb_mtn_stress_cam, only: trb_mtn_stress_tend ! only used as a stub to set to zero - TMS is not used in CAM7
     use vertical_diffusion, only: vertical_diffusion_tend
     use rayleigh_friction,  only: rayleigh_friction_run
     use physics_types,      only: physics_dme_adjust, set_dry_to_wet, physics_state_check,       &
@@ -2168,6 +2169,10 @@ contains
     end if
 
     call beljaars_drag_tend(state, pbuf, cam_in)
+
+    ! TMS is not active in CAM7 (it is only for CAM5), but the tms tend subroutine
+    ! will initialize the pbuf fields to zero - no logic is computed below:
+    call trb_mtn_stress_tend(state, pbuf, cam_in)
 
     if (trim(cam_take_snapshot_after) == "orographic_form_drag_stress") then
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
