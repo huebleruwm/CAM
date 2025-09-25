@@ -819,7 +819,7 @@ subroutine radiation_tend( &
    use rrtmgp_lw_mcica_subcol_gen,        only: rrtmgp_lw_mcica_subcol_gen_run
    use rrtmgp_lw_gas_optics_pre,          only: rrtmgp_lw_gas_optics_pre_run
    use rrtmgp_lw_gas_optics,              only: rrtmgp_lw_gas_optics_run
-   use rrtmgp_lw_rte,                    only: rrtmgp_lw_rte_run
+   use rrtmgp_lw_rte,                     only: rrtmgp_lw_rte_run
    use rrtmgp_dry_static_energy_tendency, only: rrtmgp_dry_static_energy_tendency_run
    use rrtmgp_post,                       only: rrtmgp_post_run
    use rrtmgp_sw_solar_var,               only: rrtmgp_sw_solar_var_run
