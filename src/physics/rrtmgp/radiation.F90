@@ -1222,7 +1222,7 @@ subroutine radiation_tend( &
 
          call rrtmgp_sw_mcica_subcol_gen_run(dosw, kdist_sw, nswbands, nswgpts, nday, nlay, &
                  pver, tiny, idxday, ktopcam, ktoprad, cldfprime, c_cld_tau,   &
-                 c_cld_tau_w, c_cld_tau_w_g, cloud_sw, pmid_day(:ncol,:), errmsg, errflg)
+                 c_cld_tau_w, c_cld_tau_w_g, cloud_sw, pmid_day, errmsg, errflg)
          if (errflg /= 0) then
             call endrun(sub//': '//errmsg)
          end if
