@@ -1,6 +1,6 @@
 module horizontal_interpolate
 
-!   
+!
 ! Modules Used:
 !
   use shr_kind_mod,       only: r8 => shr_kind_r8
@@ -124,10 +124,10 @@ contains
     ! encounter roundoff errors, and could cause while loops to go
     ! forever.  Values much outside the [-360, 360] range are probably
     ! an error anyway, so abort if we encounter anything suspicious here.
-    call check_invariant(((-2000.0 < input_left).and.(input_left < 2000.0)), "input_left is out of range")
-    call check_invariant(((-2000.0 < input_right).and.(input_right < 2000.0)), "input_right is out of range")
-    call check_invariant(((-2000.0 < sim_left).and.(sim_left < 2000.0)), "sim_left is out of range")
-    call check_invariant(((-2000.0 < sim_right).and.(sim_right < 2000.0)), "sim_right is out of range")
+    call check_invariant(((-2000.0_r8 < input_left).and.(input_left < 2000.0_r8)), "input_left is out of range")
+    call check_invariant(((-2000.0_r8 < input_right).and.(input_right < 2000.0_r8)), "input_right is out of range")
+    call check_invariant(((-2000.0_r8 < sim_left).and.(sim_left < 2000.0_r8)), "sim_left is out of range")
+    call check_invariant(((-2000.0_r8 < sim_right).and.(sim_right < 2000.0_r8)), "sim_right is out of range")
 
     overlap_len = calculate_lon_overlap(input_left, input_right, sim_left, sim_right)
 
@@ -358,7 +358,7 @@ contains
   real(r8) :: sum_x
 
   var_trg(:,:) = 0.0_r8
- 
+
 
   do k1=1,km1
      do n=1,ncols
