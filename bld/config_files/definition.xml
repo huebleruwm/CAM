@@ -79,9 +79,6 @@ Switch to turn on CLUBB_SGS package: 0 => no, 1 => yes
 <entry id="silhs" valid_values="0,1" value="0">
 Switch to turn on SILHS package: 0 => no, 1 => yes
 </entry>
-<entry id="unicon" valid_values="0,1" value="0">
-Switch to turn on UNICON package: 0 => off, 1 => on
-</entry>
 <entry id="clubb_do_adv" valid_values="0,1" value="0">
 Switch to turn on/off advecting CLUBB moments: 0 => no, 1 => yes
 </entry>
