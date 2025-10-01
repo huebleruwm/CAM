@@ -739,8 +739,12 @@ elsif ($rad_pkg =~ m/rrtmgp/) {
     my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
     $nl->set_variable_value('radiation_nl', 'rrtmgp_coefs_sw_file', $abs_path);
 
-    add_default($nl, 'p_top_for_rrtmgp');
-
+    add_default($nl, 'p_top_for_equil_rad');
+}
+if (not $waccm_phys) {
+    add_default($nl, 'qrsmlt_scaling');
+    add_default($nl, 'p_top_for_radmrg');
+    add_default($nl, 'p_bot_for_radmrg');
 }
 
 # Solar irradiance
@@ -3339,7 +3343,7 @@ if ($cfg->get('microphys') =~ /^mg/) {
 	add_default($nl, 'micro_mg_accre_sees_auto');
 	add_default($nl, 'micro_mg_vtrms_factor');
 	add_default($nl, 'micro_mg_implicit_fall');
-        add_default($nl, 'pumas_stochastic_tau_kernel_filename', 'val'=>"$cfgdir/../src/physics/pumas/KBARF_tau_kernel.dat");
+        add_default($nl, 'pumas_stochastic_tau_kernel_filename', 'val'=>"$cfgdir/../src/atmos_phys/schemes/pumas/pumas/KBARF_tau_kernel.dat");
 
         #set path for stochastic_tau_kernel_filename
         my $cam_dir = $cfg->get('cam_dir');
@@ -3373,7 +3377,7 @@ if ($cfg->get('microphys') =~ /^mg/) {
             $micro_mg_dcs = '500.D-6';
         }
         elsif ($phys eq 'cam7') {
-            $micro_mg_dcs = '500.D-6';
+            $micro_mg_dcs = '600.D-6';
         }
     }
 
@@ -5277,6 +5281,7 @@ sub check_snapshot_settings {
             push (@validList_ac, ("'chem_timestep_tend'"));
         }
         push (@validList_ac, ("'vertical_diffusion_section'",
+                              "'orographic_form_drag_stress'",
                               "'aero_model_drydep'", "'gw_tend'",
                               "'qbo_relax'", "'iondrag_calc_section'",
                               "'physics_dme_adjust'"));
@@ -5292,6 +5297,7 @@ sub check_snapshot_settings {
             push (@validList_ac, ("'chem_timestep_tend'"));
         }
         push (@validList_ac, ("'vertical_diffusion_section'",
+                              "'orographic_form_drag_stress'",
                               "'aero_model_drydep'", "'gw_tend'",
                               "'qbo_relax'", "'iondrag_calc_section'",
                               "'physics_dme_adjust'"));
