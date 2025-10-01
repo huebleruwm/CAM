@@ -275,7 +275,6 @@ GetOptions(
     "nc_lib=s"                  => \$opts{'nc_lib'},
     "nc_mod=s"                  => \$opts{'nc_mod'},
     "nlev=s"                    => \$opts{'nlev'},
-    "ocn=s"                     => \$opts{'ocn'},
     "offline_dyn"               => \$opts{'offline_dyn'},
     "pbl=s"                     => \$opts{'pbl'},
     "pcols=s"                   => \$opts{'pcols'},
@@ -1029,25 +1028,6 @@ $cfg_ref->set('aquaplanet', $aquaplanet);
 
 my $aqua_mode = $aquaplanet ? "ON" : "OFF";
 if ($print>=2) { print "Aqua-planet mode: $aqua_mode$eol"; }
-
-#-----------------------------------------------------------------------------------------------
-# Ocean model
-my $ocn_pkg = 'socn';
-if ($aquaplanet) {
-    # Default for aquaplanet mode is to use an analytic expression for fixed SST.
-    $ocn_pkg = 'aquaplanet';
-}
-
-# Allow the user to override the default via the commandline.
-# For aquaplanet with SOM the option '-ocn som' should be used to override
-# aquaplanet's default ocean component setting.
-if (defined $opts{'ocn'}) {
-    $ocn_pkg = lc($opts{'ocn'});
-}
-
-$cfg_ref->set('ocn', $ocn_pkg);
-
-if ($print>=2) { print "Ocean package: $ocn_pkg$eol"; }
 
 #-----------------------------------------------------------------------------------------------
 # Use modifications for perturbation growth testing?
