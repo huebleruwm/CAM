@@ -6,8 +6,11 @@ module quadrature_mod
   private
 
   type, public :: quadrature_t
-    real (kind=r8), dimension(:), pointer :: points
-    real (kind=r8), dimension(:), pointer :: weights
+    real (kind=r8), dimension(:), allocatable :: points
+    real (kind=r8), dimension(:), allocatable :: weights
+  contains
+    procedure :: finalize
+    final :: finalize_quadrature_t
   end type quadrature_t
 
   public  :: gausslobatto
@@ -32,6 +35,19 @@ module quadrature_mod
 
 
 contains
+  subroutine finalize(this)
+    class(quadrature_t), intent(inout) :: this
+    call finalize_quadrature_t(this)
+  end subroutine finalize
+
+! Deallocate and reset to initial state.
+subroutine finalize_quadrature_t(this)
+  type(quadrature_t) :: this
+
+  if(allocated(this%points))   deallocate(this%points)
+  if(allocated(this%weights))  deallocate(this%weights)
+
+end subroutine finalize_quadrature_t
 
   ! ==============================================================
   ! gauss:
@@ -258,8 +274,7 @@ contains
     print *,"sum of Gaussian weights=",gssum
     print *,"============================================"
 
-    deallocate(gs%points)
-    deallocate(gs%weights)
+    call gs%finalize()
 
   end subroutine test_gauss
 
@@ -487,8 +502,7 @@ contains
     print *,"sum of Gauss-Lobatto weights=",gllsum
     print *,"============================================"
 
-    deallocate(gll%points)
-    deallocate(gll%weights)
+    call gll.finalize()
 
   end subroutine test_gausslobatto
 
