@@ -28,7 +28,7 @@ module interpolate_mod
      real (kind=r8), dimension(:)  , allocatable :: rk    ! 1/k
      real (kind=r8), dimension(:)  , allocatable :: vtemp ! temp results
      real (kind=r8), dimension(:)  , allocatable :: glp   ! GLL pts (nair)
-  contains 
+  contains
      procedure :: finalize => finalize_interpolate_t
      final     :: finalize_interpolate_t_core
   end type interpolate_t
@@ -37,8 +37,8 @@ module interpolate_mod
      ! Output Interpolation points.  Used to output data on lat-lon (or other grid)
      ! with native element interpolation.  Each element keeps a list of points from the
      ! interpolation grid that are in this element
-     type (cartesian2D_t),pointer,dimension(:):: interp_xy      ! element coordinate
-     integer, pointer,dimension(:)            :: ilat,ilon   ! position of interpolation point in lat-lon grid
+     type (cartesian2D_t),allocatable,dimension(:):: interp_xy      ! element coordinate
+     integer, allocatable,dimension(:)            :: ilat,ilon   ! position of interpolation point in lat-lon grid
      integer                                  :: n_interp
      integer                                  :: nlat
      integer                                  :: nlon
@@ -131,9 +131,9 @@ contains
   end subroutine finalize_interpdata_t
   subroutine finalize_interpdata_t_core(this)
      type (interpdata_t) :: this
-     if(associated(this%interp_xy)) deallocate(this%interp_xy)
-     if(associated(this%ilat))      deallocate(this%ilat)
-     if(associated(this%ilon))      deallocate(this%ilon)
+     if(allocated(this%interp_xy)) deallocate(this%interp_xy)
+     if(allocated(this%ilat))      deallocate(this%ilat)
+     if(allocated(this%ilon))      deallocate(this%ilon)
   end subroutine finalize_interpdata_t_core
 
   !
@@ -1359,21 +1359,21 @@ contains
     ! allocate storage
     do ii=1,nelemd
        ngrid = interpdata(ii)%n_interp
-       if(interpdata(ii)%first_entry)then
-          NULLIFY(interpdata(ii)%interp_xy)
-          NULLIFY(interpdata(ii)%ilat)
-          NULLIFY(interpdata(ii)%ilon)
+        if(interpdata(ii)%first_entry)then
+!          NULLIFY(interpdata(ii)%interp_xy)
+!          NULLIFY(interpdata(ii)%ilat)
+!          NULLIFY(interpdata(ii)%ilon)
 
           interpdata(ii)%first_entry=.FALSE.
        endif
-       if(associated(interpdata(ii)%interp_xy))then
+       if(allocated(interpdata(ii)%interp_xy))then
           if(size(interpdata(ii)%interp_xy)>0)deallocate(interpdata(ii)%interp_xy)
        endif
-       if(associated(interpdata(ii)%ilat))then
+       if(allocated(interpdata(ii)%ilat))then
           if(size(interpdata(ii)%ilat)>0)deallocate(interpdata(ii)%ilat)
        endif
 
-       if (associated(interpdata(ii)%ilon))then
+       if (allocated(interpdata(ii)%ilon))then
           if(size(interpdata(ii)%ilon)>0)deallocate(interpdata(ii)%ilon)
        endif
        allocate(interpdata(ii)%interp_xy( ngrid ) )
