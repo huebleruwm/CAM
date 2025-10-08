@@ -28,8 +28,8 @@
 
 [submodule "atmos_phys"]
 	path = src/atmos_phys
-	url = https://github.com/sjsprecious/atmospheric_physics
-	fxtag = 5b48970
+	url = https://github.com/ESCOMP/atmospheric_physics
+	fxtag = atmos_phys0_18_002
         fxrequired = AlwaysRequired
 	fxDONOTUSEurl = https://github.com/ESCOMP/atmospheric_physics
 
