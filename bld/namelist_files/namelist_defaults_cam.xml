@@ -2105,7 +2105,6 @@
 <conv_water_in_rad phys="cam7"      > 1 </conv_water_in_rad>
 
 <conv_water_frac_limit            > 0.01d0  </conv_water_frac_limit>
-<conv_water_frac_limit unicon="1" > 0.001d0 </conv_water_frac_limit>
 
 <!-- CLUBB_SGS -->
 <do_clubb_sgs                                 > .false. </do_clubb_sgs>
@@ -2489,7 +2488,6 @@
 <eddy_max_bot_pressure phys="cam7"    waccm_phys="1" >100.D0</eddy_max_bot_pressure>
 
 <eddy_moist_entrain_a2l           >30.D0</eddy_moist_entrain_a2l>
-<eddy_moist_entrain_a2l unicon="1">40.D0</eddy_moist_entrain_a2l>
 
 <diff_cnsrv_mass_check> .false. </diff_cnsrv_mass_check>
 
@@ -2571,10 +2569,8 @@
 <sol_facti_cloud_borne clubb_sgs="1" microphys="mg3"                  >1.0D0</sol_facti_cloud_borne>
 
 <sol_factb_interstitial                >0.1D0</sol_factb_interstitial>
-<sol_factb_interstitial unicon="1"     >1.0D0</sol_factb_interstitial>
 
 <sol_factic_interstitial                >0.4D0</sol_factic_interstitial>
-<sol_factic_interstitial unicon="1"     >1.0D0</sol_factic_interstitial>
 
 <!-- sub-column switches for physics packages -->
 <use_subcol_microp                  >.false.</use_subcol_microp>
@@ -2642,12 +2638,10 @@
 <!-- convection schemes -->
 <deep_scheme                     >ZM       </deep_scheme>
 <deep_scheme           silhs="1" >off      </deep_scheme>
-<deep_scheme unicon="1"          >UNICON   </deep_scheme>
 <deep_scheme pbl="none"          >NONE     </deep_scheme>
 
 <shallow_scheme pbl="none"         >NONE     </shallow_scheme>
 <shallow_scheme pbl="uw"           >UW       </shallow_scheme>
-<shallow_scheme pbl="uw" unicon="1">UNICON   </shallow_scheme>
 <shallow_scheme pbl="hb"           >Hack     </shallow_scheme>
 <shallow_scheme pbl="hbr"          >Hack     </shallow_scheme>
 <shallow_scheme pbl="clubb_sgs"    >CLUBB_SGS</shallow_scheme>
@@ -2662,8 +2656,6 @@
 
 <cldfrc_rhminl                                                        > 0.900D0 </cldfrc_rhminl>
 <cldfrc_rhminl                   phys="cam5" carma="cirrus"           > 0.910D0 </cldfrc_rhminl>
-<cldfrc_rhminl dyn="fv"          phys="cam5" unicon="1"               > 0.850D0 </cldfrc_rhminl>
-<cldfrc_rhminl dyn="se"          phys="cam5" unicon="1"               > 0.850D0 </cldfrc_rhminl>
 <cldfrc_rhminl                   phys="cam5" microphys="mg2"          > 0.950D0 </cldfrc_rhminl>
 <cldfrc_rhminl                   phys="cam5" microphys="mg3"          > 0.950D0 </cldfrc_rhminl>
 
@@ -2688,8 +2680,6 @@
 <cldfrc_rhminl hgrid="1.9x2.5"   phys="cam4"                          > 0.910D0 </cldfrc_rhminl>
 <cldfrc_rhminl hgrid="0.9x1.25"  phys="cam4"                          > 0.920D0 </cldfrc_rhminl>
 <cldfrc_rhminl hgrid="0.47x0.63" phys="cam4"                          > 0.920D0 </cldfrc_rhminl>
-<!-- Note: the ocn attribute allows coupled and uncoupled configurations to have different tunings -->
-<cldfrc_rhminl hgrid="0.47x0.63" phys="cam4" ocn="docn"               > 0.913D0 </cldfrc_rhminl>
 <cldfrc_rhminl dyn="se"          phys="cam4"                          > 0.910D0 </cldfrc_rhminl>
 
 <cldfrc_rhminl_adj_land                                               > 0.100D0 </cldfrc_rhminl_adj_land>
@@ -2754,11 +2744,9 @@
 <cldfrc_icecrit phys="cam7"    carma="cirrus"> 0.70D0 </cldfrc_icecrit>
 
 <cldfrc2m_rhmini               >  0.80D0  </cldfrc2m_rhmini>
-<cldfrc2m_rhmini   unicon="1"  >  0.85D0  </cldfrc2m_rhmini>
 <cldfrc2m_rhmini clubb_sgs="1" >  0.80D0  </cldfrc2m_rhmini>
 
 <cldfrc2m_rhminis               >  1.0D0 </cldfrc2m_rhminis>
-<cldfrc2m_rhminis  unicon="1"   >  0.85D0 </cldfrc2m_rhminis>
 
 <cldfrc2m_rhmaxi                                     >  1.1D0  </cldfrc2m_rhmaxi>
 <cldfrc2m_rhmaxi    clubb_sgs="1"                    >  1.0D0  </cldfrc2m_rhmaxi>
@@ -2779,7 +2767,6 @@
 
 <!-- Cldwat -->
 <rk_strat_icritc                                                        >  5.0e-6  </rk_strat_icritc>
-<rk_strat_icritc  dyn="fv"           unicon="1"                         >  9.5e-6  </rk_strat_icritc>
 <rk_strat_icritc  hgrid="0.23x0.31"                                     > 45.0e-6  </rk_strat_icritc>
 <rk_strat_icritc  hgrid="0.47x0.63"                                     > 45.0e-6  </rk_strat_icritc>
 <rk_strat_icritc  hgrid="0.5x0.625"                                     > 45.0e-6  </rk_strat_icritc>
@@ -2954,7 +2941,7 @@
   'T', 'bc_a1', 'bc_a4', 'dst_a1', 'dst_a2', 'dst_a3', 'ncl_a1', 'ncl_a2', 'ncl_a3',
   'num_a1', 'num_a2', 'num_a3', 'num_a4', 'pom_a1', 'pom_a4', 'so4_a1', 'so4_a2', 'so4_a3', 'soa_a1', 'soa_a2'
 </scm_relax_fincl>
-<scm_relax_fincl   phys="cam_dev"scam="1"  >
+<scm_relax_fincl   phys="cam7"   scam="1"  >
   'T', 'bc_a1', 'bc_a4', 'dst_a1', 'dst_a2', 'dst_a3', 'ncl_a1', 'ncl_a2', 'ncl_a3',
   'num_a1', 'num_a2', 'num_a3', 'num_a4', 'pom_a1', 'pom_a4', 'so4_a1', 'so4_a2', 'so4_a3', 'soa_a1', 'soa_a2'
 </scm_relax_fincl>
