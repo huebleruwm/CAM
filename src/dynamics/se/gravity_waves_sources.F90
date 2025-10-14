@@ -340,10 +340,6 @@ CONTAINS
           C(:,:,component) = sum(dum_cart(:,:,:,k)*elem(ie)%vec_sphere2cart(:,:,:,component), 3)
         end do
 
-        ! gradth(:,:,:,k,ie) = gradient_sphere(theta,ederiv,elem(ie)%Dinv)
-        !call gradient_sphere(theta,ederiv,elem(ie)%Dinv,gradth(:,:,:,k,ie))
-        ! compute C = (grad(theta) dot grad ) u
-        !C(:,:,:) = ugradv_sphere(gradth(:,:,:,k,ie), elem(ie)%state%v(:,:,:,k,tl),ederiv,elem(ie))
         ! gradth dot C
         frontgf_gll(:,:,k,ie) = -( C(:,:,1)*gradth(:,:,1,k,ie) +  C(:,:,2)*gradth(:,:,2,k,ie)  )
         ! apply mass matrix
