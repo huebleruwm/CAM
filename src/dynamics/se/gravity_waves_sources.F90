@@ -331,7 +331,7 @@ CONTAINS
         do component=1,3
           call gradient_sphere(dum_cart(:,:,component,k),ederiv,elem(ie)%Dinv,dum_grad)
           do i=1,2
-            dum_grad(:,:,i) = dum_grad(:,:,2) - ddp_dum_cart(:,:,component,k) * gradp(:,:,component)
+            dum_grad(:,:,i) = dum_grad(:,:,2) - ddp_dum_cart(:,:,component,k) * gradp(:,:,i)
           end do
           dum_cart(:,:,component,k) = sum( gradth(:,:,:,k,ie) * dum_grad , 3 )
         end do
