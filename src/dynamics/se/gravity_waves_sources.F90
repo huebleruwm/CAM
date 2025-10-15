@@ -286,7 +286,7 @@ CONTAINS
     real(r8) :: ddp_dum_cart(np,np,3,nlev)  ! ?
     real(r8) :: C(np,np,2), sum_water(np,np)
 
-    !  By Mark Taylor 
+    !  By Mark Taylor
     !  For a vector velocity "v", a tensor "grad(v)", and a vector "grad(theta)",
     !  this loop computes the vector "grad(theta)*grad(v)"
     !
@@ -296,7 +296,7 @@ CONTAINS
     !
     !  This routine is a modified version of derivative_mod.F90:ugradv_sphere() in that the
     !  grad(v) term is modified to compute grad_p(v) - the gradient on p-surfaces expressed
-    !  in terms of the gradient on model surfaces and a vertical pressure gradient.  
+    !  in terms of the gradient on model surfaces and a vertical pressure gradient.
     !
     !  First, v is represented in cartesian coordinates  v(c) for c=1,2,3
     !  For each v(c), we compute its gradient on p-surfaces via:
@@ -437,17 +437,17 @@ CONTAINS
         pint_above = pmid(:,:,k)
         pint_below = pint(:,:,k+1)
         dint_above = data(:,:,k)
-        dint_below = ( data(:,:,k+1) + data(:,:,k) ) / 2.0
+        dint_below = ( data(:,:,k+1) + data(:,:,k) ) / 2.0_r8
       elseif (k==nlev) then
         pint_above = pint(:,:,k)
         pint_below = pmid(:,:,k)
-        dint_above = ( data(:,:,k-1) + data(:,:,k) ) / 2.0
+        dint_above = ( data(:,:,k-1) + data(:,:,k) ) / 2.0_r8
         dint_below = data(:,:,k)
       else
         pint_above = pint(:,:,k)
         pint_below = pint(:,:,k+1)
-        dint_above = ( data(:,:,k-1) + data(:,:,k) ) / 2.0
-        dint_below = ( data(:,:,k+1) + data(:,:,k) ) / 2.0
+        dint_above = ( data(:,:,k-1) + data(:,:,k) ) / 2.0_r8
+        dint_below = ( data(:,:,k+1) + data(:,:,k) ) / 2.0_r8
       end if
       ddata_dp(:,:,k) = ( dint_above - dint_below ) / ( pint_above - pint_below )
     end do
