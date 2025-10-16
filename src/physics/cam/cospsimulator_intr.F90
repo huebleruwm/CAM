@@ -725,12 +725,6 @@ CONTAINS
             'Frequency of drizzling single-layer warm clouds', flag_xyfill=.true., fill_value=R_UNDEF)
        call addfld('CS_WR_PRECIP',  horiz_only, 'A', '1', &
             'Frequency of precipitating single-layer warm clouds', flag_xyfill=.true., fill_value=R_UNDEF)
-       call addfld('CS_WR_CFODD_REFF_SMALL',(/'cosp_cfodd_dbze','cosp_cfodd_icod'/), 'A', '1', &
-            '# of CFODD (05 < Reff < 12 micron)', flag_xyfill=.true., fill_value=R_UNDEF)
-       call addfld('CS_WR_CFODD_REFF_MEDIUM',(/'cosp_cfodd_dbze','cosp_cfodd_icod'/), 'A', '1', &
-            '# of CFODD (12 < Reff < 18 micron)', flag_xyfill=.true., fill_value=R_UNDEF)
-       call addfld('CS_WR_CFODD_REFF_LARGE',(/'cosp_cfodd_dbze','cosp_cfodd_icod'/), 'A', '1', &
-            '# of CFODD (18 < Reff < 35 micron)', flag_xyfill=.true., fill_value=R_UNDEF)
 
        call add_default('CFAD_DBZE94_CS',cosp_histfile_num,' ')
        call add_default('CLD_CAL_NOTCS', cosp_histfile_num,' ')
@@ -751,11 +745,21 @@ CONTAINS
        call add_default('CS_WR_NOPRECIP',         cosp_histfile_num,' ')
        call add_default('CS_WR_DRIZ',             cosp_histfile_num,' ')
        call add_default('CS_WR_PRECIP',           cosp_histfile_num,' ')
+    end if
+
+   if (lradar_sim) then
+       call addfld('CS_WR_CFODD_REFF_SMALL',(/'cosp_cfodd_dbze','cosp_cfodd_icod'/), 'A', '1', &
+            '# of CFODD (05 < Reff < 12 micron)', flag_xyfill=.true., fill_value=R_UNDEF)
+       call addfld('CS_WR_CFODD_REFF_MEDIUM',(/'cosp_cfodd_dbze','cosp_cfodd_icod'/), 'A', '1', &
+            '# of CFODD (12 < Reff < 18 micron)', flag_xyfill=.true., fill_value=R_UNDEF)
+       call addfld('CS_WR_CFODD_REFF_LARGE',(/'cosp_cfodd_dbze','cosp_cfodd_icod'/), 'A', '1', &
+            '# of CFODD (18 < Reff < 35 micron)', flag_xyfill=.true., fill_value=R_UNDEF)
+
        call add_default('CS_WR_CFODD_REFF_SMALL', cosp_histfile_num,' ')
        call add_default('CS_WR_CFODD_REFF_MEDIUM',cosp_histfile_num,' ')
        call add_default('CS_WR_CFODD_REFF_LARGE', cosp_histfile_num,' ')
-    end if
 
+    end if
     ! MISR SIMULATOR OUTPUTS
     if (lmisr_sim) then
        call addfld('CLD_MISR', (/'cosp_tau   ','cosp_htmisr'/), 'A', 'percent', &
@@ -2303,6 +2307,9 @@ CONTAINS
        call outfld('CS_WR_NOPRECIP',wr_ocfreq_noprecip_cs,   pcols, lchnk)
        call outfld('CS_WR_DRIZ',    wr_ocfreq_drizzle_cs,    pcols, lchnk)
        call outfld('CS_WR_PRECIP',  wr_ocfreq_precip_cs,     pcols, lchnk)
+    end if
+
+    if (lradar_sim) then
        call outfld('CS_WR_CFODD_REFF_SMALL', cfodd_ntotal_small_cs, pcols, lchnk)
        call outfld('CS_WR_CFODD_REFF_MEDIUM',cfodd_ntotal_medium_cs,pcols, lchnk)
        call outfld('CS_WR_CFODD_REFF_LARGE', cfodd_ntotal_large_cs, pcols, lchnk)
