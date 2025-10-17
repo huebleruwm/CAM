@@ -4,7 +4,7 @@ module cospsimulator_intr
   !         Name:         CFMIP Observational Simulator Package Version 2 (COSP2)
   !         What:         Simulate ISCCP/CloudSat/CALIPSO/MISR/MODIS cloud products from
   !                       GCM inputs
-  !         Version:      v2.1.8 (August 2025)
+  !         Version:      v2.1.9 (October 2025)
   !         Authors:      Dustin Swales (dustin.swales@noaa.gov), Jonah Shaw (jonah.shaw@colorado.edu)
   !
   ! Modifications:
@@ -104,7 +104,9 @@ module cospsimulator_intr
   real(r8), target :: LWP_binEdges_cosp(2,nlwp_cosp_modis)
   real(r8), target :: IWP_binEdges_cosp(2,niwp_cosp_modis)
   real(r8), target :: LWP_binCenters_cosp(nlwp_cosp_modis)
-  real(r8), target :: IWP_binCenters_cosp(niwp_cosp_modis)
+  real(r8), target :: IWP_binCenters_cosp(niwp_cosp_modis)   
+  real(r8), target :: cfodd_histdbze_cosp(CFODD_NDBZE)
+  real(r8), target :: cfodd_histicod_cosp(CFODD_NICOD)
 
   integer  :: prstau_cosp(nprs_cosp*ntau_cosp)             ! ISCCP mixed output dimension index
   integer  :: prstau_cosp_modis(nprs_cosp*ntau_cosp_modis) ! MODIS mixed output dimension index
@@ -502,10 +504,10 @@ CONTAINS
             dbzemid_cosp, bounds_name='cosp_dbze_bnds', bounds=dbzelim_cosp)
        call add_hist_coord('cosp_cfodd_dbze', CFODD_NDBZE,                     &
             'COSP Mean dBZe for radar simulator CFODD output', 'dBZ',          &
-            CFODD_HISTDBZEcenters)
+            cfodd_histdbze_cosp)
        call add_hist_coord('cosp_cfodd_icod', CFODD_NICOD,                            &
             'COSP Mean in-cloud optical depth for radar simulator CFODD output', '1', &
-            CFODD_HISTICODcenters)
+            cfodd_histicod_cosp)
     end if
 
     if (lmisr_sim) then
@@ -983,6 +985,8 @@ CONTAINS
     IWP_binEdges_cosp       = IWP_binEdges
     LWP_binCenters_cosp     = LWP_binCenters
     IWP_binCenters_cosp     = IWP_binCenters
+    cfodd_histdbze_cosp     = CFODD_HISTDBZEcenters
+    cfodd_histicod_cosp     = CFODD_HISTICODcenters
 
     ! Initialize the distributional parameters for hydrometeors in radar simulator. In COSPv1.4, this was declared in
     ! cosp_defs.f.
