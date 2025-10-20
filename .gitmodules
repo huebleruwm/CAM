@@ -93,10 +93,10 @@
 
 [submodule "cosp2"]
 	path = src/physics/cosp2/src
-	url = https://github.com/CFMIP/COSPv2.0/releases/tag/v2.1.9
+	url = https://github.com/CFMIP/COSPv2.0
         fxrequired = AlwaysRequired
         fxsparse = ../.cosp_sparse_checkout
-        fxtag = v2.1.8
+        fxtag = v2.1.9
 	fxDONOTUSEurl = https://github.com/CFMIP/COSPv2.0
 
 [submodule "clubb"]

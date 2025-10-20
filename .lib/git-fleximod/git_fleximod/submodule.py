@@ -105,9 +105,22 @@ class Submodule():
                     return result, needsupdate, localmods, testfails                    
                 status, rurl = git.git_operation("ls-remote","--get-url")
                 status, lines = git.git_operation("log", "--pretty=format:\"%h %d\"")
-                line = lines.partition('\n')[0]
+                line = lines.partition('\n')[0].strip()
+                if status != 0 or not line:
+                    if self.fxtag:
+                        result = f"e {self.name:>20} not checked out, expected tag {self.fxtag}{optional}"
+                    else:
+                        result = f"e {self.name:>20} not checked out{optional}"
+                    needsupdate = True
+                    testfails = False
+                    return result, needsupdate, localmods, testfails
                 parts = line.split()
-                ahash = parts[0][1:]
+                if not parts:
+                    result = f"e {self.name:>20} unable to determine current revision{optional}"
+                    needsupdate = True
+                    testfails = True
+                    return result, needsupdate, localmods, testfails
+                ahash = parts[0].lstrip('"').rstrip('"')
                 atag = None
                 if len(parts) > 3:
                     idx = 0
