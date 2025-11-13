@@ -95,7 +95,7 @@ module clubb_intr
 
 #ifdef CLUBB_SGS
   type(clubb_config_flags_type), public :: clubb_config_flags
-  real(r8), dimension(nparams), public :: clubb_params_single_col    ! Adjustable CLUBB parameters (C1, C2 ...)
+  real(r8), dimension(1,nparams), public :: clubb_params_single_col    ! Adjustable CLUBB parameters (C1, C2 ...)
 #endif
 
   ! These are zero by default, but will be set by SILHS before they are used by subcolumns
@@ -1442,8 +1442,7 @@ end subroutine clubb_init_cnst
          set_clubb_debug_level_api, &
          clubb_fatal_error, &     ! Error code value to indicate a fatal error
          nparams, &
-         set_default_parameters_api, &
-         read_parameters_api, &
+         init_clubb_params_api, &
          w_tol_sqd, &
          rt_tol, &
          thl_tol, &
@@ -1617,112 +1616,61 @@ end subroutine clubb_init_cnst
     ! Setup CLUBB core
     ! ----------------------------------------------------------------- !
 
-    !  Read in parameters for CLUBB.  Just read in default values
-    call set_default_parameters_api( &
-               C1, C1b, C1c, C2rt, C2thl, C2rtthl, &
-               C4, C_uu_shr, C_uu_buoy, C6rt, C6rtb, C6rtc, &
-               C6thl, C6thlb, C6thlc, C7, C7b, C7c, C8, C8b, C10, &
-               C11, C11b, C11c, C12, C13, C14, C_wp2_pr_dfsn, C_wp3_pr_tp, &
-               C_wp3_pr_turb, C_wp3_pr_dfsn, C_wp2_splat, &
-               C6rt_Lscale0, C6thl_Lscale0, C7_Lscale0, wpxp_L_thresh, &
-               c_K, c_K1, nu1, c_K2, nu2, c_K6, nu6, c_K8, nu8, &
-               c_K9, nu9, nu10, c_K_hm, c_K_hmb, K_hm_min_coef, nu_hm, &
-               slope_coef_spread_DG_means_w, pdf_component_stdev_factor_w, &
-               coef_spread_DG_means_rt, coef_spread_DG_means_thl, &
-               gamma_coef, gamma_coefb, gamma_coefc, mu, beta, lmin_coef, &
-               omicron, zeta_vrnce_rat, upsilon_precip_frac_rat, &
-               lambda0_stability_coef, mult_coef, taumin, taumax, &
-               Lscale_mu_coef, Lscale_pert_coef, alpha_corr, &
-               Skw_denom_coef, c_K10, c_K10h, thlp2_rad_coef, &
-               thlp2_rad_cloud_frac_thresh, up2_sfc_coef, &
-               Skw_max_mag, xp3_coef_base, xp3_coef_slope, &
-               altitude_threshold, rtp2_clip_coef, C_invrs_tau_bkgnd, &
-               C_invrs_tau_sfc, C_invrs_tau_shear, C_invrs_tau_N2, &
-               C_invrs_tau_N2_wp2, C_invrs_tau_N2_xp2, &
-               C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3, &
-               C_invrs_tau_wpxp_Ri, C_invrs_tau_wpxp_N2_thresh, &
-               Cx_min, Cx_max, Richardson_num_min, Richardson_num_max, &
-               wpxp_Ri_exp, a3_coef_min, a_const, bv_efold, z_displace )
+     call init_clubb_params_api( 1, -99, "", &
+                                     clubb_params_single_col )
 
-    call read_parameters_api( 1, -99, "", &
-                              C1, C1b, C1c, C2rt, C2thl, C2rtthl, &
-                              C4, C_uu_shr, C_uu_buoy, C6rt, C6rtb, C6rtc, &
-                              C6thl, C6thlb, C6thlc, C7, C7b, C7c, C8, C8b, C10, &
-                              C11, C11b, C11c, C12, C13, C14, C_wp2_pr_dfsn, C_wp3_pr_tp, &
-                              C_wp3_pr_turb, C_wp3_pr_dfsn, C_wp2_splat, &
-                              C6rt_Lscale0, C6thl_Lscale0, C7_Lscale0, wpxp_L_thresh, &
-                              c_K, c_K1, nu1, c_K2, nu2, c_K6, nu6, c_K8, nu8, &
-                              c_K9, nu9, nu10, c_K_hm, c_K_hmb, K_hm_min_coef, nu_hm, &
-                              slope_coef_spread_DG_means_w, pdf_component_stdev_factor_w, &
-                              coef_spread_DG_means_rt, coef_spread_DG_means_thl, &
-                              gamma_coef, gamma_coefb, gamma_coefc, mu, beta, lmin_coef, &
-                              omicron, zeta_vrnce_rat, upsilon_precip_frac_rat, &
-                              lambda0_stability_coef, mult_coef, taumin, taumax, &
-                              Lscale_mu_coef, Lscale_pert_coef, alpha_corr, &
-                              Skw_denom_coef, c_K10, c_K10h, thlp2_rad_coef, &
-                              thlp2_rad_cloud_frac_thresh, up2_sfc_coef, &
-                              Skw_max_mag, xp3_coef_base, xp3_coef_slope, &
-                              altitude_threshold, rtp2_clip_coef, C_invrs_tau_bkgnd, &
-                              C_invrs_tau_sfc, C_invrs_tau_shear, C_invrs_tau_N2, &
-                              C_invrs_tau_N2_wp2, C_invrs_tau_N2_xp2, &
-                              C_invrs_tau_N2_wpxp, C_invrs_tau_N2_clear_wp3, &
-                              C_invrs_tau_wpxp_Ri, C_invrs_tau_wpxp_N2_thresh, &
-                              Cx_min, Cx_max, Richardson_num_min, Richardson_num_max, &
-                              wpxp_Ri_exp, a3_coef_min, a_const, bv_efold, z_displace, &
-                              clubb_params_single_col )
-
-    clubb_params_single_col(iC2rtthl) = clubb_C2rtthl
-    clubb_params_single_col(iC8) = clubb_C8
-    clubb_params_single_col(iC11) = clubb_c11
-    clubb_params_single_col(iC11b) = clubb_c11b
-    clubb_params_single_col(iC14) = clubb_c14
-    clubb_params_single_col(iC_wp3_pr_turb) = clubb_C_wp3_pr_turb
-    clubb_params_single_col(ic_K10) = clubb_c_K10
-    clubb_params_single_col(imult_coef) = clubb_mult_coef
-    clubb_params_single_col(iSkw_denom_coef) = clubb_Skw_denom_coef
-    clubb_params_single_col(iC2rt) = clubb_C2rt
-    clubb_params_single_col(iC2thl) = clubb_C2thl
-    clubb_params_single_col(ibeta) = clubb_beta
-    clubb_params_single_col(iC6rt) = clubb_c6rt
-    clubb_params_single_col(iC6rtb) = clubb_c6rtb
-    clubb_params_single_col(iC6rtc) = clubb_c6rtc
-    clubb_params_single_col(iC6thl) = clubb_c6thl
-    clubb_params_single_col(iC6thlb) = clubb_c6thlb
-    clubb_params_single_col(iC6thlc) = clubb_c6thlc
-    clubb_params_single_col(iwpxp_L_thresh) = clubb_wpxp_L_thresh
-    clubb_params_single_col(iC7) = clubb_C7
-    clubb_params_single_col(iC7b) = clubb_C7b
-    clubb_params_single_col(igamma_coef) = clubb_gamma_coef
-    clubb_params_single_col(ic_K10h) = clubb_c_K10h
-    clubb_params_single_col(ilambda0_stability_coef) = clubb_lambda0_stability_coef
-    clubb_params_single_col(ilmin_coef) = clubb_lmin_coef
-    clubb_params_single_col(iC8b) = clubb_C8b
-    clubb_params_single_col(iskw_max_mag) = clubb_skw_max_mag
-    clubb_params_single_col(iC1)  = clubb_C1
-    clubb_params_single_col(iC1b) = clubb_C1b
-    clubb_params_single_col(igamma_coefb) = clubb_gamma_coefb
-    clubb_params_single_col(iup2_sfc_coef) = clubb_up2_sfc_coef
-    clubb_params_single_col(iC4) = clubb_C4
-    clubb_params_single_col(iC_uu_shr) = clubb_C_uu_shr
-    clubb_params_single_col(iC_uu_buoy) = clubb_C_uu_buoy
-    clubb_params_single_col(ic_K1) = clubb_c_K1
-    clubb_params_single_col(ic_K2) = clubb_c_K2
-    clubb_params_single_col(inu2)  = clubb_nu2
-    clubb_params_single_col(ic_K8) = clubb_c_K8
-    clubb_params_single_col(ic_K9) = clubb_c_K9
-    clubb_params_single_col(inu9)  = clubb_nu9
-    clubb_params_single_col(iC_wp2_splat) = clubb_C_wp2_splat
-    clubb_params_single_col(iC_invrs_tau_bkgnd) = clubb_C_invrs_tau_bkgnd
-    clubb_params_single_col(iC_invrs_tau_sfc) = clubb_C_invrs_tau_sfc
-    clubb_params_single_col(iC_invrs_tau_shear) = clubb_C_invrs_tau_shear
-    clubb_params_single_col(iC_invrs_tau_N2) = clubb_C_invrs_tau_N2
-    clubb_params_single_col(iC_invrs_tau_N2_wp2) = clubb_C_invrs_tau_N2_wp2
-    clubb_params_single_col(iC_invrs_tau_N2_xp2) = clubb_C_invrs_tau_N2_xp2
-    clubb_params_single_col(iC_invrs_tau_N2_wpxp) = clubb_C_invrs_tau_N2_wpxp
-    clubb_params_single_col(iC_invrs_tau_N2_clear_wp3) = clubb_C_invrs_tau_N2_clear_wp3
-    clubb_params_single_col(ibv_efold) = clubb_bv_efold
-    clubb_params_single_col(iwpxp_Ri_exp) = clubb_wpxp_Ri_exp
-    clubb_params_single_col(iz_displace) = clubb_z_displace
+    clubb_params_single_col(:,iC2rtthl) = clubb_C2rtthl
+    clubb_params_single_col(:,iC8) = clubb_C8
+    clubb_params_single_col(:,iC11) = clubb_c11
+    clubb_params_single_col(:,iC11b) = clubb_c11b
+    clubb_params_single_col(:,iC14) = clubb_c14
+    clubb_params_single_col(:,iC_wp3_pr_turb) = clubb_C_wp3_pr_turb
+    clubb_params_single_col(:,ic_K10) = clubb_c_K10
+    clubb_params_single_col(:,imult_coef) = clubb_mult_coef
+    clubb_params_single_col(:,iSkw_denom_coef) = clubb_Skw_denom_coef
+    clubb_params_single_col(:,iC2rt) = clubb_C2rt
+    clubb_params_single_col(:,iC2thl) = clubb_C2thl
+    clubb_params_single_col(:,ibeta) = clubb_beta
+    clubb_params_single_col(:,iC6rt) = clubb_c6rt
+    clubb_params_single_col(:,iC6rtb) = clubb_c6rtb
+    clubb_params_single_col(:,iC6rtc) = clubb_c6rtc
+    clubb_params_single_col(:,iC6thl) = clubb_c6thl
+    clubb_params_single_col(:,iC6thlb) = clubb_c6thlb
+    clubb_params_single_col(:,iC6thlc) = clubb_c6thlc
+    clubb_params_single_col(:,iwpxp_L_thresh) = clubb_wpxp_L_thresh
+    clubb_params_single_col(:,iC7) = clubb_C7
+    clubb_params_single_col(:,iC7b) = clubb_C7b
+    clubb_params_single_col(:,igamma_coef) = clubb_gamma_coef
+    clubb_params_single_col(:,ic_K10h) = clubb_c_K10h
+    clubb_params_single_col(:,ilambda0_stability_coef) = clubb_lambda0_stability_coef
+    clubb_params_single_col(:,ilmin_coef) = clubb_lmin_coef
+    clubb_params_single_col(:,iC8b) = clubb_C8b
+    clubb_params_single_col(:,iskw_max_mag) = clubb_skw_max_mag
+    clubb_params_single_col(:,iC1)  = clubb_C1
+    clubb_params_single_col(:,iC1b) = clubb_C1b
+    clubb_params_single_col(:,igamma_coefb) = clubb_gamma_coefb
+    clubb_params_single_col(:,iup2_sfc_coef) = clubb_up2_sfc_coef
+    clubb_params_single_col(:,iC4) = clubb_C4
+    clubb_params_single_col(:,iC_uu_shr) = clubb_C_uu_shr
+    clubb_params_single_col(:,iC_uu_buoy) = clubb_C_uu_buoy
+    clubb_params_single_col(:,ic_K1) = clubb_c_K1
+    clubb_params_single_col(:,ic_K2) = clubb_c_K2
+    clubb_params_single_col(:,inu2)  = clubb_nu2
+    clubb_params_single_col(:,ic_K8) = clubb_c_K8
+    clubb_params_single_col(:,ic_K9) = clubb_c_K9
+    clubb_params_single_col(:,inu9)  = clubb_nu9
+    clubb_params_single_col(:,iC_wp2_splat) = clubb_C_wp2_splat
+    clubb_params_single_col(:,iC_invrs_tau_bkgnd) = clubb_C_invrs_tau_bkgnd
+    clubb_params_single_col(:,iC_invrs_tau_sfc) = clubb_C_invrs_tau_sfc
+    clubb_params_single_col(:,iC_invrs_tau_shear) = clubb_C_invrs_tau_shear
+    clubb_params_single_col(:,iC_invrs_tau_N2) = clubb_C_invrs_tau_N2
+    clubb_params_single_col(:,iC_invrs_tau_N2_wp2) = clubb_C_invrs_tau_N2_wp2
+    clubb_params_single_col(:,iC_invrs_tau_N2_xp2) = clubb_C_invrs_tau_N2_xp2
+    clubb_params_single_col(:,iC_invrs_tau_N2_wpxp) = clubb_C_invrs_tau_N2_wpxp
+    clubb_params_single_col(:,iC_invrs_tau_N2_clear_wp3) = clubb_C_invrs_tau_N2_clear_wp3
+    clubb_params_single_col(:,ibv_efold) = clubb_bv_efold
+    clubb_params_single_col(:,iwpxp_Ri_exp) = clubb_wpxp_Ri_exp
+    clubb_params_single_col(:,iz_displace) = clubb_z_displace
 
     ! Override clubb default
     if ( trim(subcol_scheme) == 'SILHS' ) then
@@ -1732,18 +1680,18 @@ end subroutine clubb_init_cnst
     end if
 
     ! Define model constant parameters
-    call setup_parameters_model_api( theta0, ts_nudge, clubb_params_single_col(iSkw_max_mag) )
+    call setup_parameters_model_api( theta0, ts_nudge, clubb_params_single_col(1,iSkw_max_mag) )
 
     !  Set up CLUBB core.  Note that some of these inputs are overwritten
     !  when clubb_tend_cam is called.  The reason is that heights can change
     !  at each time step, which is why dummy arrays are read in here for heights
     !  as they are immediately overwrote.
 !$OMP PARALLEL
-    call check_clubb_settings_api( nzm_clubb, clubb_params_single_col,  & ! Intent(in)
-                                   l_implemented,                       & ! Intent(in)
-                                   l_input_fields,                      & ! Intent(in)
-                                   clubb_config_flags,                  & ! intent(in)
-                                   err_code )                             ! Intent(out)
+    call check_clubb_settings_api( 1, clubb_params_single_col,  & ! Intent(in)
+                                   l_implemented,               & ! Intent(in)
+                                   l_input_fields,              & ! Intent(in)
+                                   clubb_config_flags,          & ! intent(in)
+                                   err_code )                     ! Intent(out)
 
     if ( err_code == clubb_fatal_error ) then
        call endrun('clubb_ini_cam:  FATAL ERROR CALLING SETUP_CLUBB_CORE')
@@ -1753,7 +1701,7 @@ end subroutine clubb_init_cnst
     ! Print the list of CLUBB parameters
     if ( masterproc ) then
        do j = 1, nparams, 1
-          write(iulog,*) params_list(j), " = ", clubb_params_single_col(j)
+          write(iulog,*) params_list(j), " = ", clubb_params_single_col(1,j)
        enddo
     endif
 
@@ -2360,7 +2308,6 @@ end subroutine clubb_init_cnst
     ! Local CLUBB variables dimensioned as NCOL (only useful columns) to be sent into the clubb run api
     ! NOTE: THESE VARIABLS SHOULD NOT BE USED IN PBUF OR OUTFLD (HISTORY) SUBROUTINES
     real(r8), dimension(state%ncol,nzt_clubb,hydromet_dim) :: &
-      hydromet,     &
       wp2hmp,       &
       rtphmp_zt,    &
       thlphmp_zt
@@ -2609,6 +2556,9 @@ end subroutine clubb_init_cnst
 
     real(r8), dimension(state%ncol,nparams) :: &
       clubb_params    ! Adjustable CLUBB parameters (C1, C2 ...)
+
+    real(r8), dimension(state%ncol,nzt_clubb) :: &
+      Lscale
 
     integer :: &
       sclr, &
@@ -2956,7 +2906,7 @@ end subroutine clubb_init_cnst
     !$acc     copyout( edsclr_out )
 
     !$acc data if( hydromet_dim > 0 ) &
-    !$acc      create( hydromet, wphydrometp, wp2hmp, rtphmp_zt, thlphmp_zt ) &
+    !$acc      create( wphydrometp, wp2hmp, rtphmp_zt, thlphmp_zt ) &
     !$acc      copyin( hm_metadata, hm_metadata%l_mix_rat_hm )
     call t_stopf('clubb_tend_cam:acc_copyin')
     call t_startf('clubb_tend_cam:ACCR')
@@ -3100,7 +3050,6 @@ end subroutine clubb_init_cnst
       do ixind=1, hydromet_dim
         do k=1, nzt_clubb
           do i=1, ncol
-            hydromet(i,k,ixind)    = 0._r8
             wp2hmp(i,k,ixind)      = 0._r8
             rtphmp_zt(i,k,ixind)   = 0._r8
             thlphmp_zt(i,k,ixind)  = 0._r8
@@ -3354,7 +3303,7 @@ end subroutine clubb_init_cnst
     !$acc parallel loop gang vector collapse(2) default(present)
     do i = 1, ncol
       do n = 1, nparams
-        clubb_params(i,n) = clubb_params_single_col(n)
+        clubb_params(i,:) = clubb_params_single_col(1,:)
       end do
     end do
 
@@ -3745,7 +3694,7 @@ end subroutine clubb_init_cnst
           p_in_Pa, rho_zm, rho_zt, exner, &
           rho_ds_zm, rho_ds_zt, invrs_rho_ds_zm, &
           invrs_rho_ds_zt, thv_ds_zm, thv_ds_zt, &
-          hydromet, hm_metadata%l_mix_rat_hm, &
+          hm_metadata%l_mix_rat_hm, &
           rfrzm, &
           wphydrometp, wp2hmp, rtphmp_zt, thlphmp_zt, &
           grid_dx, grid_dy, &
@@ -3773,7 +3722,8 @@ end subroutine clubb_init_cnst
           qclvar_out, thlprcp_out, &
           wprcp_out, w_up_in_cloud_out, w_down_in_cloud_out,  &
           cloudy_updraft_frac_out, cloudy_downdraft_frac_out, &
-          rcm_in_layer_out, cloud_cover_out, invrs_tau_zm_out )
+          rcm_in_layer_out, cloud_cover_out, invrs_tau_zm_out, &
+          Lscale )
       call t_stopf('clubb_tend_cam:advance_clubb_core_api')
 
       ! Note that CLUBB does not produce an error code specific to any column, and
@@ -3828,10 +3778,9 @@ end subroutine clubb_init_cnst
         qrl_zm     = zt2zm_api( nzm_clubb, nzt_clubb, ncol, gr, qrl_clubb )
         thlp2_rad_out(:,:) = 0._r8
 
-        do i=1, ncol
-          call calculate_thlp2_rad_api(nzm_clubb, rcm_out_zm(i,:), thlprcp_out(i,:), qrl_zm(i,:), clubb_params(i,:), &
-                                       thlp2_rad_out(i,:))
-        end do
+        call calculate_thlp2_rad_api( ncol, nzm_clubb, nzt_clubb, gr, &
+                                      rcm_inout, thlprcp_out, qrl_clubb, clubb_params, &
+                                      thlp2_rad_out )
 
         do i=1, ncol
           thlp2_in(i,:) = thlp2_in(i,:) + thlp2_rad_out(i,:) * dtime

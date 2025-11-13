@@ -59,10 +59,6 @@ module subcol_SILHS
   ! Calc subcol mean ! Calc subcol variance
   private :: meansc
   private :: stdsc
-  
-  type (stats), target :: stats_lh_zt,   &
-                          stats_lh_sfc
-  !$omp threadprivate(stats_lh_zt, stats_lh_sfc)
 
  real( kind = core_rknd ), dimension(:,:), allocatable :: &
      corr_array_n_cloud, &
@@ -620,7 +616,6 @@ contains
                                         genrand_intg, genrand_init_api, &
 
                                         nparams, ic_K, &
-                                        read_parameters_api, &
                                         Cp, Lv, &
                                         grid, setup_grid_api, &
                                         init_precip_fracs_api
@@ -735,6 +730,9 @@ contains
                  ice_all_pts,   & ! Calculate Cld Ice from LH output
                  nice_all_pts,  & ! Calculate Num cld ice from LH
                  nclw_all_pts     ! Calculate Num cld wat from LH
+
+      type (stats), dimension(state%ngrdcol) :: stats_lh_zt,   &
+                                                stats_lh_sfc
 
      !----------------
      ! Output from clip_transform_silhs_output_api
@@ -920,7 +918,7 @@ contains
      call pbuf_get_field(pbuf, kvh_idx, khzm_in)
 
      ! Pull c_K from clubb parameters.
-     c_K = clubb_params_single_col(ic_K)
+     c_K = clubb_params_single_col(1,ic_K)
 
      !----------------
      ! Copy state and populate numbers and values of sub-columns
@@ -1137,7 +1135,7 @@ contains
                                     corr_array_n_cloud, corr_array_n_below, &                      ! In
                                     hm_metadata, &                                                 ! In
                                     pdf_params_chnk(lchnk), &                                      ! In
-                                    clubb_params_single_col, &                                     ! In
+                                    clubb_params_single_col(1,:), &                                ! In
                                     clubb_config_flags%iiPDF_type, &                               ! In
                                     clubb_config_flags%l_use_precip_frac, &                        ! In
                                     clubb_config_flags%l_predict_upwp_vpwp, &                      ! In
@@ -1219,7 +1217,6 @@ contains
                    l_calc_weights_all_levs_itime, &                      ! In 
                    pdf_params_chnk(lchnk), delta_zm, Lscale, &           ! In
                    lh_seed, hm_metadata, &                               ! In
-                   rho_ds_zt, &                                          ! In 
                    mu_x_1, mu_x_2, sigma_x_1, sigma_x_2, &               ! In 
                    corr_cholesky_mtx_1, corr_cholesky_mtx_2, &           ! In
                    precip_fracs, silhs_config_flags, &                   ! In
@@ -1230,7 +1227,7 @@ contains
                    lh_sample_point_weights)                              ! Out
 
      ! Extract clipped variables from subcolumns
-     call clip_transform_silhs_output_api( gr, pver-top_lev+1, ngrdcol, num_subcols,  & ! In
+     call clip_transform_silhs_output_api( pver-top_lev+1, ngrdcol, num_subcols,  & ! In
                                            pdf_dim, hydromet_dim, hm_metadata,        & ! In
                                            X_mixt_comp_all_levs,                      & ! In
                                            X_nl_all_levs,                             & ! In
