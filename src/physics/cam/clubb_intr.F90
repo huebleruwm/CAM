@@ -405,7 +405,6 @@ module clubb_intr
     wp2thvp_idx, &      ! second order buoyancy term
     rtpthvp_idx, &      ! moisture buoyancy correlation
     thlpthvp_idx, &     ! temperature buoyancy correlation
-    sclrpthvp_idx, &    ! passive scalar buoyancy correlation
     wp2rtp_idx, &       ! w'^2 rt'
     wp2thlp_idx, &      ! w'^2 thl'
     uprcp_idx, &        ! < u' r_c' >
@@ -2116,7 +2115,9 @@ end subroutine clubb_init_cnst
       pdf_parameter, &
       init_pdf_params_api, &
       init_pdf_implicit_coefs_terms_api, &
-      setup_grid_api
+      setup_grid_api, &
+      iiPDF_new, &
+      iiPDF_new_hybrid
 
     ! Import setup for CLUBB error messaging
     use clubb_api_module, only: &
@@ -2782,9 +2783,14 @@ end subroutine clubb_init_cnst
       call init_pdf_params_api( nzm_clubb, ncol, pdf_params_zm_chnk(lchnk) )
     end if
 
-    if ( .not. allocated(pdf_implicit_coefs_terms_chnk(lchnk)%coef_wp4_implicit) ) then
-      call init_pdf_implicit_coefs_terms_api( nzt_clubb, ncol, sclr_dim, &
-                                              pdf_implicit_coefs_terms_chnk(lchnk) )
+    if ( clubb_config_flags%iiPDF_type == iiPDF_new         .or. &
+         clubb_config_flags%iiPDF_type == iiPDF_new_hybrid       ) then
+
+      if ( .not. allocated(pdf_implicit_coefs_terms_chnk(lchnk)%coef_wp4_implicit) ) then
+        call init_pdf_implicit_coefs_terms_api( nzt_clubb, ncol, sclr_dim, &
+                                                pdf_implicit_coefs_terms_chnk(lchnk) )
+      end if
+
     end if
 
     ! Initialize err_info with parallelization and geographical info
@@ -2874,7 +2880,8 @@ end subroutine clubb_init_cnst
     !$acc              state1, state1%q, state1%u, state1%v, state1%t, state1%pmid, state1%s, state1%pint, &
     !$acc              state1%zm, state1%zi, state1%pdeldry, state1%pdel, state1%omega, state1%phis, &
     !$acc              cam_in, cam_in%shf, cam_in%wsx, cam_in%wsy, cam_in%cflx, &
-    !$acc              rrho, prer_evap, rtp2_mc_zt, thlp2_mc_zt, wprtp_mc_zt, wpthlp_mc_zt, rtpthlp_mc_zt ) &
+    !$acc              rrho, prer_evap, rtp2_mc_zt, thlp2_mc_zt, wprtp_mc_zt, wpthlp_mc_zt, rtpthlp_mc_zt, &
+    !$acc              err_info, err_info%err_header ) &
     !$acc        copy( um, vm, upwp, vpwp, wpthvp, wp2thvp, rtpthvp, thlpthvp, up2, vp2, up3, vp3, &
     !$acc              wp2, wp3, rtp2, thlp2, rtp3, thlp3, thlm, rtm, rvm, wprtp, wpthlp, rtpthlp, &
     !$acc              pdf_zm_w_1, pdf_zm_w_2, pdf_zm_varnce_w_1, pdf_zm_varnce_w_2, pdf_zm_mixt_frac, &
@@ -2905,6 +2912,7 @@ end subroutine clubb_init_cnst
     !$acc              radf, wpthlp_sfc, clubb_params, sfc_elevation, wprtp_sfc, upwp_sfc, vpwp_sfc, &
     !$acc              rtm_ref, thlm_ref, um_ref, vm_ref, ug, vg, p_in_Pa, exner, um_pert_inout, &
     !$acc              thlprcp_out, deltaz, zi_g, zt_g, qrl_clubb, &
+    !$acc              err_info%err_code, &
     !$acc              pdf_params_chnk(lchnk)%w_1, pdf_params_chnk(lchnk)%w_2, &
     !$acc              pdf_params_chnk(lchnk)%varnce_w_1, pdf_params_chnk(lchnk)%varnce_w_2, &
     !$acc              pdf_params_chnk(lchnk)%rt_1, pdf_params_chnk(lchnk)%rt_2, &
@@ -2962,6 +2970,13 @@ end subroutine clubb_init_cnst
     !$acc      copyin( hm_metadata, hm_metadata%l_mix_rat_hm )
     call t_stopf('clubb_tend_cam:acc_copyin')
     call t_startf('clubb_tend_cam:ACCR')
+
+    !$acc parallel loop gang vector collapse(2) default(present)
+    do i = 1, ncol
+      do n = 1, nparams
+        clubb_params(i,:) = clubb_params_single_col(1,:)
+      end do
+    end do
 
     !$acc parallel loop gang vector collapse(2) default(present)
     do k = 1, pver
@@ -3271,14 +3286,6 @@ end subroutine clubb_init_cnst
 
     endif
 
-    ! Define the CLUBB momentum grid (in height, units of m)
-    !$acc parallel loop gang vector collapse(2) default(present)
-    do k=1, nzm_clubb
-      do i=1, ncol
-        zi_g(i,k) = state1%zi(i,pverp-k+1) - state1%zi(i,pver+1)
-      end do
-    end do
-
     !$acc parallel loop gang vector collapse(2) default(present)
     do k=1, pver
       do i=1, ncol
@@ -3307,8 +3314,17 @@ end subroutine clubb_init_cnst
       enddo
     enddo
 
+    ! Define the CLUBB momentum grid (in height, units of m)
+    !$acc parallel loop gang vector collapse(2) default(present)
+    do k=1, nzm_clubb
+      do i=1, ncol
+        zi_g(i,k) = state1%zi(i,pverp-k+1) - state1%zi(i,pver+1)
+      end do
+    end do
+
     !  Compute thermodynamic stuff needed for CLUBB on thermo levels.
     !  Inputs for the momentum levels are set below setup_clubb core
+    ! Flipped grid calcs
     !$acc parallel loop gang vector collapse(2) default(present)
     do k = 1, nzt_clubb
       do i = 1, ncol
@@ -3352,64 +3368,6 @@ end subroutine clubb_init_cnst
       sfc_elevation(i) = state1%zi(i,pverp)
 
     end do
-
-
-    !$acc parallel loop gang vector collapse(2) default(present)
-    do i = 1, ncol
-      do n = 1, nparams
-        clubb_params(i,:) = clubb_params_single_col(1,:)
-      end do
-    end do
-
-    ! ------------------------------------------------- !
-    ! Begin case specific code for SCAM cases.          !
-    ! This section of code block is NOT called in       !
-    ! global simulations                                !
-    ! ------------------------------------------------- !
-    if (single_column .and. .not. scm_cambfb_mode) then
-
-      !  Initialize zo if variable ustar is used
-      if (cam_in%landfrac(1) >= 0.5_r8) then
-        zo(1) = 0.035_r8
-      else
-        zo(1) = 0.0001_r8
-      endif
-
-      !  Compute surface wind (ubar)
-      ubar = sqrt(um(1,pver)**2+vm(1,pver)**2)
-      if (ubar <  0.25_r8) ubar = 0.25_r8
-
-      !  Below denotes case specifics for surface momentum
-      !  and thermodynamic fluxes, depending on the case
-
-      !  Define ustar (based on case, if not variable)
-      ustar = 0.25_r8   ! Initialize ustar in case no case
-
-      if(trim(scm_clubb_iop_name)  ==  'BOMEX_5day') then
-        ustar = 0.28_r8
-      endif
-
-      if(trim(scm_clubb_iop_name)  ==  'ATEX_48hr') then
-        ustar = 0.30_r8
-      endif
-
-      if(trim(scm_clubb_iop_name)  ==  'RICO_3day') then
-        ustar      = 0.28_r8
-      endif
-
-      if(trim(scm_clubb_iop_name)  ==  'arm97' .or. trim(scm_clubb_iop_name)  ==  'gate' .or. &
-         trim(scm_clubb_iop_name)  ==  'toga' .or. trim(scm_clubb_iop_name)  ==  'mpace' .or. &
-         trim(scm_clubb_iop_name)  ==  'ARM_CC') then
-
-          bflx22(1) = (gravit/theta0)*wpthlp_sfc(1)
-          ustar  = diag_ustar(zt_g(1,2),bflx22(1),ubar,zo(1))
-      endif
-
-      !  Compute the surface momentum fluxes, if this is a SCAM simulation
-      upwp_sfc(1) = -um(1,pver)*ustar**2/ubar
-      vpwp_sfc(1) = -vm(1,pver)*ustar**2/ubar
-
-    end if
 
 
     !  Heights need to be set at each timestep.  Therefore, recall
@@ -3493,6 +3451,57 @@ end subroutine clubb_init_cnst
       wprtp_sfc(i)  = cam_in%cflx(i,1)/rho_ds_zm(i,1)         ! Moisture flux
     end do
 
+
+    ! ------------------------------------------------- !
+    ! Begin case specific code for SCAM cases.          !
+    ! This section of code block is NOT called in       !
+    ! global simulations                                !
+    ! ------------------------------------------------- !
+    if (single_column .and. .not. scm_cambfb_mode) then
+
+      !  Initialize zo if variable ustar is used
+      if (cam_in%landfrac(1) >= 0.5_r8) then
+        zo(1) = 0.035_r8
+      else
+        zo(1) = 0.0001_r8
+      endif
+
+      !  Compute surface wind (ubar)
+      ubar = sqrt(um(1,pver)**2+vm(1,pver)**2)
+      if (ubar <  0.25_r8) ubar = 0.25_r8
+
+      !  Below denotes case specifics for surface momentum
+      !  and thermodynamic fluxes, depending on the case
+
+      !  Define ustar (based on case, if not variable)
+      ustar = 0.25_r8   ! Initialize ustar in case no case
+
+      if(trim(scm_clubb_iop_name)  ==  'BOMEX_5day') then
+        ustar = 0.28_r8
+      endif
+
+      if(trim(scm_clubb_iop_name)  ==  'ATEX_48hr') then
+        ustar = 0.30_r8
+      endif
+
+      if(trim(scm_clubb_iop_name)  ==  'RICO_3day') then
+        ustar      = 0.28_r8
+      endif
+
+      if(trim(scm_clubb_iop_name)  ==  'arm97' .or. trim(scm_clubb_iop_name)  ==  'gate' .or. &
+         trim(scm_clubb_iop_name)  ==  'toga' .or. trim(scm_clubb_iop_name)  ==  'mpace' .or. &
+         trim(scm_clubb_iop_name)  ==  'ARM_CC') then
+
+          bflx22(1) = (gravit/theta0)*wpthlp_sfc(1)
+          ustar  = diag_ustar(zt_g(1,2),bflx22(1),ubar,zo(1))
+      endif
+
+      !  Compute the surface momentum fluxes, if this is a SCAM simulation
+      upwp_sfc(1) = -um(1,pver)*ustar**2/ubar
+      vpwp_sfc(1) = -vm(1,pver)*ustar**2/ubar
+
+    end if
+    
     ! Implementation after Thomas Toniazzo (NorESM) and Colin Zarzycki (PSU)
     !  Other Surface fluxes provided by host model
     if( (cld_macmic_num_steps > 1) .and. clubb_l_intr_sfc_flux_smooth ) then
