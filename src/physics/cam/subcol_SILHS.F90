@@ -25,7 +25,8 @@ module subcol_SILHS
        pdf_params_chnk, &
        hm_metadata, &
        hydromet_dim, &
-       pdf_dim
+       pdf_dim, &
+       l_ascending_grid
        
   use clubb_api_module, only: &
        hmp2_ip_on_hmm2_ip_slope_type, &
@@ -599,7 +600,7 @@ contains
      use subcol_utils,           only : subcol_set_subcols, subcol_set_weight
      use subcol_pack_mod,        only : subcol_pack
      use phys_control,           only : phys_getopts
-     use spmd_utils,             only : masterproc
+     use spmd_utils,             only : masterproc, iam
      use shr_const_mod,          only : SHR_CONST_PI, SHR_CONST_RHOFW
 
 #ifdef CLUBB_SGS
@@ -613,15 +614,18 @@ contains
                                         w_tol_sqd, zero_threshold, &
                                         em_min, cloud_frac_min, & ! rc_tol, &
 
-                                        genrand_intg, genrand_init_api, &
-
                                         nparams, ic_K, &
                                         Cp, Lv, &
                                         grid, setup_grid_api, &
-                                        init_precip_fracs_api
+                                        init_precip_fracs_api, &
+                                        clubb_fatal_error, &
+                                        err_info_type, &
+                                        init_err_info_api, &
+                                        cleanup_err_info_api
   
      use silhs_api_module, only :       generate_silhs_sample_api, & ! Ncn_to_Nc, &
                                         clip_transform_silhs_output_api, &
+                                        genrand_intg, genrand_init_api, &
                                         est_kessler_microphys_api, &
                                         vert_decorr_coef
 
@@ -665,6 +669,11 @@ contains
        lh_seed    ! Seed used in random number generator that will be different
                   ! for each column, yet reproducible for a restart run
 
+     type(err_info_type) :: &
+       err_info          ! err_info struct used in CLUBB containing err_code and err_header
+
+     real(r8), parameter :: rad2deg=180.0_r8/SHR_CONST_PI
+
      !----------------
      ! Required for set_up_pdf_params_incl_hydromet
      !----------------
@@ -691,6 +700,8 @@ contains
      integer :: iter                            ! CLUBB iteration 
      integer :: num_subcols                     ! Number of subcolumns
      integer, parameter :: sequence_length = 1  ! Number of timesteps btn subcol calls
+
+     real(r8), dimension(state%ngrdcol) :: deltaz
      
      real(r8), dimension(state%ngrdcol,pver-top_lev+1) :: rho_ds_zt    ! Dry static density (kg/m^3) on thermo levs
      real(r8), dimension(state%ngrdcol,pver)  :: dz_g         ! thickness of layer
@@ -920,6 +931,9 @@ contains
      ! Pull c_K from clubb parameters.
      c_K = clubb_params_single_col(1,ic_K)
 
+     ! Initialize err_info with parallelization and geographical info
+     call init_err_info_api(ncol, iam, lchnk, state%lat*rad2deg, state%lon*rad2deg, err_info)
+
      !----------------
      ! Copy state and populate numbers and values of sub-columns
      !----------------
@@ -964,13 +978,23 @@ contains
        !  Set the elevation of the surface
        sfc_elevation(i) = state%zi(i,pver+1)
      end do
-     
+
+     do i=1, ngrdcol
+        deltaz(i) = zi_g(i,2) - zi_g(i,1)
+     end do
+
      !  Heights need to be set at each timestep.
      call setup_grid_api( pverp+1-top_lev, ncol, sfc_elevation(1:ncol), l_implemented,  & ! intent(in)
-                          grid_type, zi_g(1:ncol,2), zi_g(1:ncol,1), zi_g(1:ncol,pverp+1-top_lev),   & ! intent(in)
-                          zi_g(1:ncol,:), zt_g(1:ncol,:),                              & ! intent(in)
-                          gr )        
+                          l_ascending_grid, grid_type,                                  &
+                          deltaz, zi_g(1:ncol,1), zi_g(1:ncol,pverp+1-top_lev),         & ! intent(in)
+                          zi_g(1:ncol,:), zt_g(1:ncol,:),                               & ! intent(in)
+                          gr, err_info )        
         
+      if ( any(err_info%err_code == clubb_fatal_error) ) then
+        call endrun(err_info%err_header_global//NEW_LINE('a')// &
+                    'CAM subcol_gen_SILHS: Fatal error calling setup_grid_api')
+      end if
+
      ! Calculate the distance between grid levels on the host model grid,
      ! using host model grid indices.
      do k = top_lev, pver
@@ -1144,7 +1168,7 @@ contains
                                     clubb_config_flags%l_const_Nc_in_cloud, &                      ! In
                                     clubb_config_flags%l_fix_w_chi_eta_correlations, &             ! In
                                     stats_metadata, &                                              ! In
-                                    stats_zt, stats_zm, stats_sfc, &                               ! In
+                                    stats_zt, stats_zm, stats_sfc, err_info, &                     ! In
                                     hydrometp2, &                                                  ! Inout
                                     mu_x_1, mu_x_2, &                                              ! Out
                                     sigma_x_1, sigma_x_2, &                                        ! Out
@@ -1152,6 +1176,11 @@ contains
                                     corr_cholesky_mtx_1, corr_cholesky_mtx_2, &                    ! Out
                                     precip_fracs )                                                 ! Inout
      
+      if ( any(err_info%err_code == clubb_fatal_error) ) then
+        call endrun(err_info%err_header_global//NEW_LINE('a')// &
+                    'CAM subcol_gen_SILHS: Fatal error calling setup_pdf_parameters_api')
+      end if
+
      ! In order for Lscale to be used properly, it needs to be passed out of
      ! advance_clubb_core, saved to the pbuf, and then pulled out of the
      ! pbuf for use here.  The profile of Lscale is passed into subroutine
@@ -1215,16 +1244,21 @@ contains
      call generate_silhs_sample_api( &
                    iter, pdf_dim, num_subcols, sequence_length, pver-top_lev+1, ngrdcol, & ! In
                    l_calc_weights_all_levs_itime, &                      ! In 
-                   pdf_params_chnk(lchnk), delta_zm, Lscale, &           ! In
+                   gr, pdf_params_chnk(lchnk), delta_zm, Lscale, &       ! In
                    lh_seed, hm_metadata, &                               ! In
                    mu_x_1, mu_x_2, sigma_x_1, sigma_x_2, &               ! In 
                    corr_cholesky_mtx_1, corr_cholesky_mtx_2, &           ! In
                    precip_fracs, silhs_config_flags, &                   ! In
                    vert_decorr_coef, &                                   ! In
                    stats_metadata, &                                     ! In
-                   stats_lh_zt, stats_lh_sfc, &                          ! InOut
+                   stats_lh_zt, stats_lh_sfc, err_info, &                ! InOut
                    X_nl_all_levs, X_mixt_comp_all_levs, &                ! Out
                    lh_sample_point_weights)                              ! Out
+
+      if ( any(err_info%err_code == clubb_fatal_error) ) then
+        call endrun(err_info%err_header_global//NEW_LINE('a')// &
+                    'CAM subcol_gen_SILHS: Fatal error calling generate_silhs_sample_api')
+      end if
 
      ! Extract clipped variables from subcolumns
      call clip_transform_silhs_output_api( pver-top_lev+1, ngrdcol, num_subcols,  & ! In
@@ -1238,6 +1272,9 @@ contains
                                            lh_Nc_clipped )                              ! Out
      !$acc wait
       
+     ! Cleaning up err_info
+     call cleanup_err_info_api(err_info)
+
      if ( l_est_kessler_microphys ) then
        call endrun('subcol_SILHS: l_est_kessler_microphys = T is not currently supported')
      end if

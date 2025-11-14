@@ -3940,6 +3940,18 @@ Gaussian PDF, and also decreases the difference between the means of w from
 each Gaussian.
 </entry>
 
+<entry id="clubb_grid_adapt_in_time_method" type="integer" category="pblrad"
+       group="clubb_params_nl" valid_values="0,1" >
+Specifier for method to construct a grid density function to adapt grid to.
+Valid values: 0 (no grid adaptation), 1 (use Lscale and wp2)
+</entry>
+
+<entry id="clubb_grid_remap_method" type="integer" category="pblrad"
+       group="clubb_params_nl" valid_values="1" >
+Specifier for method to remap values from one grid to another.
+Valid values: 1 (ullrich remapping)
+</entry>
+
 <entry id="clubb_iiPDF_type" type="integer" category="pblrad"
        group="clubb_params_nl" valid_values="1,2,3,4,5,6,7" >
 Selected option for the two-component normal (double Gaussian) PDF type to use for the w, rt,
@@ -3964,6 +3976,11 @@ Intensity of stability correction applied to C1 and C6
 Coefficient used to determine the minimum allowable value of CLUBB's length
 scale (Lscale) in a grid-spacing dependent formula.  Increasing the value of
 clubb_lmin_coef increases the minimum allowable value for length scale.
+</entry>
+
+<entry id="clubb_l_add_dycore_grid" type="logical" category="pblrad"
+       group="clubb_params_nl" valid_values="" >
+Flag to remap values from the dycore grid.
 </entry>
 
 <entry id="clubb_l_brunt_vaisala_freq_moist" type="logical" category="pblrad"

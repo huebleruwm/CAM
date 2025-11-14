@@ -137,9 +137,11 @@ module clubb_intr
       sclr_tol = 1.e-8_r8               ! Total water in kg/kg
 
   real(r8), parameter :: &
-      theta0   = 300._r8, &             ! Reference temperature                     [K]
-      ts_nudge = 86400._r8, &           ! Time scale for u/v nudging (not used)     [s]
-      p0_clubb = 100000._r8
+      rtm_min                 = epsilon( rtm_min ),   & ! Value below which rtm will be nudged [kg/kg]
+      rtm_nudge_max_altitude  = 10000._r8,            & ! Highest altitude at which to nudge rtm [m]
+      theta0                  = 300._r8,              & ! Reference temperature                     [K]
+      ts_nudge                = 86400._r8,            & ! Time scale for u/v nudging (not used)     [s]
+      p0_clubb                = 100000._r8
 
   real(r8), parameter :: &
     wp3_const = 1._r8                   ! Constant to add to wp3 when moments are advected
@@ -227,7 +229,13 @@ module clubb_intr
                                            ! CLUBB's PDF.
     clubb_penta_solve_method = unset_i,  & ! Specifier for method to solve the penta-diagonal system
     clubb_tridiag_solve_method = unset_i,& ! Specifier for method to solve tri-diagonal systems
-    clubb_saturation_equation = unset_i    ! Specifier for which saturation formula to use
+    clubb_saturation_equation = unset_i, & ! Specifier for which saturation formula to use
+    clubb_grid_remap_method = unset_i, & ! Specifier for which method should be used to
+                                         ! map values from one grid to another
+                                         ! (starts at 1, so 0 is an invalid option for this flag)
+    clubb_grid_adapt_in_time_method = unset_i        ! Specifier for how the grid density method should
+                                                     ! be constructed if the grid should be adapted over time
+                                                     ! (set to 0 for no adaptation)
 
 
   logical :: &
@@ -346,7 +354,10 @@ module clubb_intr
     clubb_l_mono_flux_lim_vm,           & ! Flag to turn on monotonic flux limiter for vm
     clubb_l_mono_flux_lim_spikefix,     & ! Flag to implement monotonic flux limiter code that
                                           ! eliminates spurious drying tendencies at model top
-    clubb_l_host_applies_sfc_fluxes       ! Whether the host model applies the surface fluxes
+    clubb_l_host_applies_sfc_fluxes,    & ! Whether the host model applies the surface fluxes
+    clubb_l_wp2_fill_holes_tke,         & ! Whether TKE is taken from up2 and vp2 to fill holes in wp2
+    clubb_l_add_dycore_grid               ! Flag to remap values from dycore grid
+
 
   logical :: &
     clubb_l_intr_sfc_flux_smooth = .false. ! Add a locally calculated roughness to upwp and vpwp sfc fluxes
@@ -499,6 +510,8 @@ module clubb_intr
   type(pdf_parameter), target, allocatable :: pdf_params_zm_chnk(:) ! PDF parameters on momentum levs. [units vary]
 
   type(implicit_coefs_terms), target, allocatable :: pdf_implicit_coefs_terms_chnk(:) ! PDF impl. coefs. & expl. terms      [units vary]
+
+  logical, parameter, public :: l_ascending_grid = .true. ! For now
 #endif
 
   contains
@@ -824,10 +837,13 @@ end subroutine clubb_init_cnst
          clubb_do_liqsupersat, &
          clubb_gamma_coef, &
          clubb_gamma_coefb, &
+         clubb_grid_adapt_in_time_method, &
+         clubb_grid_remap_method, &
          clubb_iiPDF_type, &
          clubb_ipdf_call_placement, &
          clubb_lambda0_stability_coef, &
          clubb_lmin_coef, &
+         clubb_l_add_dycore_grid, &
          clubb_l_brunt_vaisala_freq_moist, &
          clubb_l_C2_cloud_frac, &
          clubb_l_calc_thlp2_rad, &
@@ -909,6 +925,8 @@ end subroutine clubb_init_cnst
                                              clubb_penta_solve_method, & ! Out
                                              clubb_tridiag_solve_method, & ! Out
                                              clubb_saturation_equation, & ! Out
+                                             clubb_grid_remap_method, & ! Out
+                                             clubb_grid_adapt_in_time_method, & ! Out
                                              clubb_l_use_precip_frac, & ! Out
                                              clubb_l_predict_upwp_vpwp, & ! Out
                                              clubb_l_min_wp2_from_corr_wx, & ! Out
@@ -963,7 +981,9 @@ end subroutine clubb_init_cnst
                                              clubb_l_mono_flux_lim_um, & ! Out
                                              clubb_l_mono_flux_lim_vm, & ! Out
                                              clubb_l_mono_flux_lim_spikefix, &  ! Out
-                                             clubb_l_host_applies_sfc_fluxes ) ! Out
+                                             clubb_l_host_applies_sfc_fluxes, & ! Out
+                                             clubb_l_wp2_fill_holes_tke, & ! Out
+                                             clubb_l_add_dycore_grid ) ! Out
 
     !  Call CLUBB+MF namelist
     call clubb_mf_readnl(nlfile)
@@ -1214,12 +1234,20 @@ end subroutine clubb_init_cnst
     if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_l_mono_flux_lim_spikefix")
     call mpi_bcast(clubb_l_host_applies_sfc_fluxes,   1, mpi_logical, mstrid, mpicom, ierr)
     if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_l_host_applies_sfc_fluxes")
+    call mpi_bcast(clubb_l_wp2_fill_holes_tke,   1, mpi_logical, mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_l_wp2_fill_holes_tke")
+    call mpi_bcast(clubb_l_add_dycore_grid,   1, mpi_logical, mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_l_add_dycore_grid")
     call mpi_bcast(clubb_penta_solve_method,    1, mpi_integer, mstrid, mpicom, ierr)
     if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_penta_solve_method")
     call mpi_bcast(clubb_tridiag_solve_method,    1, mpi_integer, mstrid, mpicom, ierr)
     if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_tridiag_solve_method")
     call mpi_bcast(clubb_saturation_equation,    1, mpi_integer, mstrid, mpicom, ierr)
     if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_saturation_equation")
+    call mpi_bcast(clubb_grid_remap_method,    1, mpi_integer, mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_grid_remap_method")
+    call mpi_bcast(clubb_grid_adapt_in_time_method,    1, mpi_integer, mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_grid_adapt_in_time_method")
     call mpi_bcast(clubb_l_intr_sfc_flux_smooth,    1, mpi_logical, mstrid, mpicom, ierr)
     if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_l_intr_sfc_flux_smooth")
     call mpi_bcast(clubb_l_vary_convect_depth,    1, mpi_logical, mstrid, mpicom, ierr)
@@ -1326,6 +1354,8 @@ end subroutine clubb_init_cnst
     if(clubb_penta_solve_method == unset_i) call endrun(sub//": FATAL: clubb_penta_solve_method not set")
     if(clubb_tridiag_solve_method == unset_i) call endrun(sub//": FATAL: clubb_tridiag_solve_method not set")
     if(clubb_saturation_equation == unset_i) call endrun(sub//": FATAL: clubb_saturation_equation not set")
+    if(clubb_grid_remap_method == unset_i) call endrun(sub//": FATAL: clubb_grid_remap_method not set")
+    if(clubb_grid_adapt_in_time_method == unset_i) call endrun(sub//": FATAL: clubb_grid_adapt_in_time_method not set")
     if(clubb_detphase_lowtemp >= meltpt_temp) &
     call endrun(sub//": ERROR: clubb_detphase_lowtemp must be less than 268.15 K")
 
@@ -1334,6 +1364,8 @@ end subroutine clubb_init_cnst
                                                  clubb_penta_solve_method, & ! In
                                                  clubb_tridiag_solve_method, & ! In
                                                  clubb_saturation_equation, & ! In
+                                                 clubb_grid_remap_method, & ! In
+                                                 clubb_grid_adapt_in_time_method, & ! In
                                                  clubb_l_use_precip_frac, & ! In
                                                  clubb_l_predict_upwp_vpwp, & ! In
                                                  clubb_l_min_wp2_from_corr_wx, & ! In
@@ -1389,6 +1421,8 @@ end subroutine clubb_init_cnst
                                                  clubb_l_mono_flux_lim_vm, & ! In
                                                  clubb_l_mono_flux_lim_spikefix, & ! In
                                                  clubb_l_host_applies_sfc_fluxes, & ! In
+                                                 clubb_l_wp2_fill_holes_tke, & ! In
+                                                 clubb_l_add_dycore_grid, & ! In
                                                  clubb_config_flags ) ! Out
 
 #endif
@@ -1434,13 +1468,15 @@ end subroutine clubb_init_cnst
 
     use clubb_api_module, only: &
          print_clubb_config_flags_api, &
-         setup_parameters_model_api, &
          check_clubb_settings_api, &
          init_pdf_params_api, &
          time_precision, &
          core_rknd, &
          set_clubb_debug_level_api, &
          clubb_fatal_error, &     ! Error code value to indicate a fatal error
+         err_info_type, &
+         init_default_err_info_api, &
+         cleanup_err_info_api, &
          nparams, &
          init_clubb_params_api, &
          w_tol_sqd, &
@@ -1454,7 +1490,6 @@ end subroutine clubb_init_cnst
     use time_manager,              only: is_first_step
     use constituents,           only: cnst_get_ind
     use phys_control,           only: phys_getopts
-    use spmd_utils,             only: iam
     use cam_logfile,            only: iulog
 #endif
 
@@ -1470,7 +1505,9 @@ end subroutine clubb_init_cnst
     ! The similar name to clubb_history is unfortunate...
     logical :: history_amwg, history_clubb
 
-    integer :: err_code                   ! Code for when CLUBB fails
+    type(err_info_type) :: &
+      err_info          ! err_info struct used in CLUBB containing err_code and err_header
+      
     integer :: i, j, k, l                    ! Indices
     integer :: nmodes, nspec, m
     integer :: ixq, ixcldice, ixcldliq, ixnumliq, ixnumice
@@ -1679,24 +1716,26 @@ end subroutine clubb_init_cnst
       clubb_config_flags%saturation_formula = saturation_gfdl     ! Goff & Gratch (1946) approximation for SVP
     end if
 
-    ! Define model constant parameters
-    call setup_parameters_model_api( theta0, ts_nudge, clubb_params_single_col(1,iSkw_max_mag) )
-
     !  Set up CLUBB core.  Note that some of these inputs are overwritten
     !  when clubb_tend_cam is called.  The reason is that heights can change
     !  at each time step, which is why dummy arrays are read in here for heights
     !  as they are immediately overwrote.
+    !! Initialize err_info with default values since info is not available here
+    call init_default_err_info_api(1, err_info)
 !$OMP PARALLEL
     call check_clubb_settings_api( 1, clubb_params_single_col,  & ! Intent(in)
                                    l_implemented,               & ! Intent(in)
                                    l_input_fields,              & ! Intent(in)
                                    clubb_config_flags,          & ! intent(in)
-                                   err_code )                     ! Intent(out)
+                                   err_info )                     ! Intent(inout)
 
-    if ( err_code == clubb_fatal_error ) then
-       call endrun('clubb_ini_cam:  FATAL ERROR CALLING SETUP_CLUBB_CORE')
+    if ( any(err_info%err_code == clubb_fatal_error) ) then
+       call endrun('clubb_ini_cam: FATAL ERROR CALLING CHECK_CLUBB_SETTINGS_API')
     end if
 !$OMP END PARALLEL
+
+    ! Cleanup err_info since it is not needed anymore
+    call cleanup_err_info_api(err_info)
 
     ! Print the list of CLUBB parameters
     if ( masterproc ) then
@@ -2054,9 +2093,11 @@ end subroutine clubb_init_cnst
 
 #ifdef CLUBB_SGS
     use holtslag_boville_diff, only: hb_pbl_dependent_coefficients_run
+    use spmd_utils, only: iam
     use clubb_api_module, only: &
       nparams, &
-      setup_parameters_api, &
+      calc_derrived_params_api, &
+      check_parameters_api, &
       time_precision, &
       advance_clubb_core_api, &
       zt2zm_api, zm2zt_api, &
@@ -2077,8 +2118,12 @@ end subroutine clubb_init_cnst
       init_pdf_implicit_coefs_terms_api, &
       setup_grid_api
 
+    ! Import setup for CLUBB error messaging
     use clubb_api_module, only: &
-      clubb_fatal_error    ! Error code value to indicate a fatal error
+      clubb_fatal_error,    & ! Error code value to indicate a fatal error
+      err_info_type,        &
+      init_err_info_api,    &
+      cleanup_err_info_api
 
     use cldfrc2m,                  only: aist_vector, rhmini_const, rhmaxi_const, rhminis_const, rhmaxis_const
     use cam_history,               only: outfld
@@ -2134,13 +2179,15 @@ end subroutine clubb_init_cnst
     integer :: ixcldice, ixcldliq, ixnumliq, ixnumice, ixq
     integer :: itim_old
     integer :: ncol, lchnk                       ! # of columns, and chunk identifier
-    integer :: err_code                          ! Diagnostic, for if some calculation goes amiss.
     integer :: icnt
     logical :: lq2(pcnst)
 
     integer :: iter
 
     integer :: clubbtop(pcols)
+
+    type(err_info_type) :: &
+      err_info          ! err_info struct used in CLUBB containing err_code and err_header
 
     real(r8) :: frac_limit, ic_limit
 
@@ -2527,6 +2574,8 @@ end subroutine clubb_init_cnst
 
     real(r8) :: temp2d(pcols,pver)  ! temporary array for holding scaled outputs
 
+    real(r8), dimension(state%ncol) :: deltaz
+
     real(r8), dimension(pcols,pver) :: &
       rvmtend_clubb, &
       rcmtend_clubb, &
@@ -2552,7 +2601,7 @@ end subroutine clubb_init_cnst
     type(grid) :: gr
 
     type(nu_vertical_res_dep) :: nu_vert_res_dep   ! Vertical resolution dependent nu values
-    real(r8) :: lmin
+    real(r8) :: lmin, mixt_frac_max_mag
 
     real(r8), dimension(state%ncol,nparams) :: &
       clubb_params    ! Adjustable CLUBB parameters (C1, C2 ...)
@@ -2738,6 +2787,9 @@ end subroutine clubb_init_cnst
                                               pdf_implicit_coefs_terms_chnk(lchnk) )
     end if
 
+    ! Initialize err_info with parallelization and geographical info
+    call init_err_info_api(ncol, lchnk, iam, state1%lat*rad2deg, state1%lon*rad2deg, err_info)
+
     !--------------------- Scalar Setting --------------------
 
     dl_rad = clubb_detliq_rad
@@ -2852,7 +2904,7 @@ end subroutine clubb_init_cnst
     !$acc              invrs_rho_ds_zm, invrs_rho_ds_zt, thv_ds_zm, thv_ds_zt, rfrzm, &
     !$acc              radf, wpthlp_sfc, clubb_params, sfc_elevation, wprtp_sfc, upwp_sfc, vpwp_sfc, &
     !$acc              rtm_ref, thlm_ref, um_ref, vm_ref, ug, vg, p_in_Pa, exner, um_pert_inout, &
-    !$acc              thlprcp_out, zi_g, zt_g, qrl_clubb, &
+    !$acc              thlprcp_out, deltaz, zi_g, zt_g, qrl_clubb, &
     !$acc              pdf_params_chnk(lchnk)%w_1, pdf_params_chnk(lchnk)%w_2, &
     !$acc              pdf_params_chnk(lchnk)%varnce_w_1, pdf_params_chnk(lchnk)%varnce_w_2, &
     !$acc              pdf_params_chnk(lchnk)%rt_1, pdf_params_chnk(lchnk)%rt_2, &
@@ -3290,6 +3342,8 @@ end subroutine clubb_init_cnst
     !$acc parallel loop gang vector default(present)
     do i = 1, ncol
 
+      deltaz(i) = zi_g(i,2) - zi_g(i,1)
+
       ! For consistency, set surface pressure to p_in_Pa at the first thermo.
       ! level above the surface (according to the CLUBB ascending grid).
       p_sfc(i) = p_in_Pa(i,1)
@@ -3359,7 +3413,7 @@ end subroutine clubb_init_cnst
 
 
     !  Heights need to be set at each timestep.  Therefore, recall
-    !  setup_grid and setup_parameters for this.
+    !  setup_grid and check_parameters_api for this.
 
     !  Set-up CLUBB core at each CLUBB call because heights can change
     !  Important note:  do not make any calls that use CLUBB grid-height
@@ -3368,20 +3422,31 @@ end subroutine clubb_init_cnst
 
     call t_stopf('clubb_tend_cam:ACCR')
     call t_startf('clubb_tend_cam:NAR')
-    !$acc update host( zi_g, zt_g, clubb_params, sfc_elevation )
+    !$acc update host( deltaz, zi_g, zt_g, clubb_params, sfc_elevation )
 
-    call setup_grid_api( nzm_clubb, ncol, sfc_elevation, l_implemented,      & ! intent(in)
-                         grid_type, zi_g(:,2), zi_g(:,1), zi_g(:,nzm_clubb), & ! intent(in)
+    call setup_grid_api( nzm_clubb, ncol, sfc_elevation, l_implemented,   & ! intent(in)
+                         l_ascending_grid, grid_type,                     & ! intent(in)
+                         deltaz, zi_g(:,1), zi_g(:,nzm_clubb),            & ! intent(in)
                          zi_g, zt_g,                                      & ! intent(in)
-                         gr )                                               ! intent(out)
+                         gr, err_info )                                     ! intent(inout)
 
+    if ( any(err_info%err_code == clubb_fatal_error) ) then
+       call endrun(subr//':  '//err_info%err_header_global//NEW_LINE('a')// &
+                   'in CLUBB setup_grid')
+    end if
 
-    call setup_parameters_api( zi_g(:,2), clubb_params, gr, ncol, grid_type,  & ! intent(in)
-                               clubb_config_flags%l_prescribed_avg_deltaz,    & ! intent(in)
-                               lmin, nu_vert_res_dep, err_code )                ! intent(out)
+    call calc_derrived_params_api( gr, ncol, grid_type, deltaz,                 & ! Intent(in)
+                                   clubb_params,                                & ! Intent(in)
+                                   clubb_config_flags%l_prescribed_avg_deltaz,  & ! Intent(in)
+                                   nu_vert_res_dep, lmin,                       & ! intent(inout)
+                                   mixt_frac_max_mag )                            ! intent(inout)
 
-    if ( err_code == clubb_fatal_error ) then
-      call endrun(subr//':  Fatal error in CLUBB setup_parameters')
+    call check_parameters_api( ncol, clubb_params, lmin, & ! Intent(in)
+                               err_info )                  ! Intent(inout)
+
+    if ( any(err_info%err_code == clubb_fatal_error) ) then
+       call endrun(subr//': '//err_info%err_header_global//NEW_LINE('a')// &
+                   'in CLUBB check_parameters_api')
     end if
 
     call t_stopf('clubb_tend_cam:NAR')
@@ -3699,6 +3764,8 @@ end subroutine clubb_init_cnst
           wphydrometp, wp2hmp, rtphmp_zt, thlphmp_zt, &
           grid_dx, grid_dy, &
           clubb_params, nu_vert_res_dep, lmin, &
+          mixt_frac_max_mag, theta0, ts_nudge, &
+          rtm_min, rtm_nudge_max_altitude, &
           clubb_config_flags, &
           stats_metadata, &
           stats_zt(:ncol), stats_zm(:ncol), stats_sfc(:ncol), &
@@ -3707,7 +3774,7 @@ end subroutine clubb_init_cnst
           wp2_in, wp3_in, rtp2_in, rtp3_in, thlp2_in, thlp3_in, rtpthlp_in, &
           sclrm, &
           sclrp2, sclrp3, sclrprtp, sclrpthlp, &
-          wpsclrp, edsclr_in, err_code, &
+          wpsclrp, edsclr_in, err_info, &
           rcm_inout, cloud_frac_inout, &
           wpthvp_in, wp2thvp_in, rtpthvp_in, thlpthvp_in, &
           sclrpthvp_inout, &
@@ -3728,16 +3795,9 @@ end subroutine clubb_init_cnst
 
       ! Note that CLUBB does not produce an error code specific to any column, and
       ! one value only for the entire chunk
-      if ( err_code == clubb_fatal_error ) then
-        write(fstderr,*) "Fatal error in CLUBB: at timestep ", get_nstep()
-        write(fstderr,*) "LAT Range: ", state1%lat(1)*rad2deg, &
-             " -- ", state1%lat(ncol)*rad2deg
-        tmp_lon1 = state1%lon(1)*rad2deg
-        tmp_lon1 = state1%lon(ncol)*rad2deg
-        if(tmp_lon1.gt.180.0_r8) tmp_lon1=tmp_lon1-360.0_r8
-        if(tmp_lonN.gt.180.0_r8) tmp_lonN=tmp_lonN-360.0_r8
-        write(fstderr,*) "LON: Range:", tmp_lon1, " -- ", tmp_lonN
-        call endrun(subr//':  Fatal error in CLUBB library')
+      if ( any(err_info%err_code == clubb_fatal_error) ) then
+        write(fstderr,*) "Fatal error in CLUBB advance_clubb_core: at timestep ", get_nstep()
+        call endrun(subr//': '//err_info%err_header_global//NEW_LINE('a')//'Fatal error in CLUBB advance_clubb_core')
       end if
 
       if ( do_rainturb ) then
@@ -4800,6 +4860,9 @@ end subroutine clubb_init_cnst
     call t_stopf('clubb_tend_cam:NAR')
 #endif
 
+    ! Cleanup err_info
+    call cleanup_err_info_api(err_info)
+
     call t_stopf('clubb_tend_cam')
 
     return
@@ -5498,7 +5561,7 @@ end function diag_ustar
     enddo
 
     do i = 1, stats_zm%num_output_fields
-      do k = 1, stats_zt%kk
+      do k = 1, stats_zm%kk
          out_zm(thecol,pverp-k+1,i) = stats_zm%accum_field_values(1,1,k,i)
          if(is_nan(out_zm(thecol,k,i))) out_zm(thecol,k,i) = 0.0_r8
       enddo
